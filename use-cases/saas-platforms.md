@@ -5,172 +5,161 @@ icon: desktop
 
 # SaaS Platforms
 
-**TL;DR:** Juspay Hyperswitch provides SaaS platforms with a multi-tenant payment infrastructure that supports merchant-specific processors, hierarchical isolation, and unified operations.
+## TL;DR
+
+Juspay Hyperswitch helps SaaS platforms scale multi-tenant payment infrastructure through connector abstraction, hierarchical tenant isolation, and unified operations. You can onboard merchants programmatically, support BYOP (Bring Your Own Processor), and maintain unified observability across all connected payment providers.
 
 ---
 
-## What payment challenges do SaaS platforms face?
+## Why do SaaS platforms struggle with multi-tenant payments?
 
-SaaS platforms in commerce, bookings, and professional services must manage payments for thousands of distinct merchants. The core challenge is balancing standardisation with flexibility.
+SaaS platforms operating in commerce, bookings, and professional services face a unique challenge: they must act as the central nervous system for thousands of distinct merchants. A recurring friction exists between scalability (standardising payments) and flexibility (allowing merchants to bring their own processors). Juspay Hyperswitch resolves this by providing a composable payment mesh that standardises these differences without requiring custom engineering for each merchant.
 
-| Challenge | Description |
-|-----------|-------------|
-| Processor lock-in | Merchants have pre-negotiated rates with specific providers |
-| Tenant isolation | Each merchant's data and routing rules must stay separate |
-| Onboarding scale | Manual provisioning creates operational bottlenecks |
-| Fragmented flows | Different PSPs handle 3DS, refunds, and errors differently |
-| Vendor lock-in | PSP-specific vaults trap saved customer cards |
+The sections below outline the architectural patterns required to scale a multi-tenant payment infrastructure.
 
 ---
 
-## What is the Connector Abstraction Layer?
+## How does the Connector Abstraction Layer support BYOP?
 
-The Connector Abstraction Layer (also called BYOP — Bring Your Own Processor) decouples your platform from specific payment providers. You integrate once, and transactions route to each merchant's preferred processor based on configuration.
+High-value merchants often refuse to migrate their payment processing to the SaaS platform because they have pre-negotiated rates or historical data with specific providers (e.g., Stripe, Adyen, Worldpay). Supporting these "brownfield" merchants usually requires building and maintaining dozens of custom integrations.
 
-### How does it work?
+Juspay Hyperswitch acts as a Connector Abstraction Layer. You integrate our SDK once, and we dynamically route the transaction to the merchant's preferred processor based on their configuration.
 
-| Feature | Description |
-|---------|-------------|
-| Unified API | Normalises 300+ processor APIs into a single [Payment Intent Flow](https://api-reference.hyperswitch.io/v1/payments/payments--create#payments-create) |
-| Zero-Code Integration | Add new processors via configuration, not code. See [Supported Connectors](https://juspay.io/integrations) |
-| Deployment Models | Full-Stack Mode (Juspay Hyperswitch handles UI and tokenisation) or Backend-Only (you own the UI) |
-
-### What problems does it solve?
-
-| Problem | Solution |
-|---------|----------|
-| Merchants refuse to migrate from existing providers | Support their current processor without custom integration work |
-| Maintaining dozens of PSP integrations | Single integration covers all processors |
-| Per-merchant processor preferences | Route dynamically based on merchant configuration |
+| Feature | Description | Reference |
+|---------|-------------|-----------|
+| Unified API | Normalises 300+ processor APIs into a single Payment Intent Flow | [Payment Intent Flow](https://api-reference.hyperswitch.io/v1/payments/payments--create#payments-create) |
+| Zero-Code Integration | New processors added via configuration, not code | [Supported Connectors](https://juspay.io/integrations) |
+| Deployment Models | Full-Stack Mode (we handle UI & Tokenisation) or Backend-Only (you own the UI) | — |
 
 ---
 
 ## How does hierarchical tenant isolation work?
 
-Juspay Hyperswitch provides a built-in hierarchy: **Organisation → Account → Profile**. This model ensures each merchant's routing rules, API keys, and customer data remain isolated.
+SaaS platforms must ensure that one merchant's routing rules, API keys, and customer data never leak to another. Building this "tenancy logic" from scratch is risky and delays time-to-market.
 
-Refer to [Multiple Accounts and Profiles](https://docs.hyperswitch.io/explore-hyperswitch/account-management/multiple-accounts-and-profiles) for the complete data model.
+Juspay Hyperswitch provides a built-in [Organisation → Merchant → Profile](https://docs.hyperswitch.io/explore-hyperswitch/account-management/multiple-accounts-and-profiles) data model designed specifically for platforms.
 
-### What does each level control?
+| Level | Purpose | Benefit |
+|-------|---------|---------|
+| Organisation | Top-level container for the platform | Centralised governance |
+| Merchant | Individual merchant entity | Isolates API keys and routing rules |
+| Profile | Business unit segmentation | Manages regional splits (e.g., "Merchant A - US Store" vs. "Merchant A - EU Store") |
 
-| Level | Purpose |
-|-------|---------|
-| Organisation | Top-level entity, typically the SaaS platform |
-| Account | Individual merchant, isolated API keys and routing rules |
-| Profile | Business unit or regional split (e.g., "Account A - US Store" vs "Account A - EU Store") |
+Additional capabilities:
 
-### How do I manage team access?
-
-Use [User Management](https://docs.hyperswitch.io/explore-hyperswitch/account-management/manage-your-team) controls to map dashboard users to specific levels of the hierarchy.
-
----
-
-## How do I onboard merchants programmatically?
-
-Use the [Management APIs](https://api-reference.hyperswitch.io/v1/merchant-account/merchant-account--create#merchant-account-create) to automate the full merchant lifecycle. Treat onboarding as an API call rather than a manual process.
-
-### What APIs are available?
-
-| API | Purpose |
-|-----|---------|
-| [Merchant Account Create](https://api-reference.hyperswitch.io/v1/merchant-account/merchant-account--create#merchant-account-create) | Create a new merchant entity |
-| [Connector Configuration API](https://api-reference.hyperswitch.io/v1/merchant-connector-account/merchant-connector--create#merchant-connector-create) | Inject merchant's Stripe/Adyen credentials |
-
-### What liability models are supported?
-
-| Model | Description |
-|-------|-------------|
-| Merchant of Record (MoR) | Platform holds funds |
-| Connected Account | Merchant holds funds |
+- **Granular Control**: Isolate API keys and routing rules at the Merchant ID level.
+- **Team Access**: Map your control centre users to specific levels of the hierarchy using our [User Management](https://docs.hyperswitch.io/explore-hyperswitch/account-management/manage-your-team) controls.
 
 ---
 
-## How does Juspay Hyperswitch handle 3DS and payment flows?
+## How can I onboard merchants programmatically?
 
-Juspay Hyperswitch normalises complex payment flows into a standard state machine. Your frontend handles a single response type regardless of the underlying processor's behaviour.
+Manual onboarding via a control centre is an operational bottleneck. To scale, platforms need to provision sub-merchants, inject credentials, and configure webhooks programmatically at the moment of signup.
 
-### What flows are unified?
+Treat merchant onboarding as an API call, not a support ticket. Juspay Hyperswitch exposes [Management APIs](https://api-reference.hyperswitch.io/v1/merchant-account/merchant-account--create#merchant-account-create) to fully automate the lifecycle.
 
-| Flow | Description |
-|------|-------------|
-| 3D Secure (3DS) | Automatic handling across all processors. See [3DS documentation](https://docs.hyperswitch.io/explore-hyperswitch/merchant-controls/payment-features/3d-secure-3ds) |
-| Auth, Capture, Void | Single API syntax across PSPs. See [Connector Payment Flows](https://docs.hyperswitch.io/learn-more/hyperswitch-architecture/connector-payment-flows) |
+| Capability | Description | API Reference |
+|------------|-------------|---------------|
+| Instant Onboarding | Create a new merchant entity and inject their Stripe/Adyen keys | [Connector Configuration API](https://api-reference.hyperswitch.io/v1/merchant-connector-account/merchant-connector--create#merchant-connector-create) |
+| Flexible Liability | Support MoR models (platform holds funds) and Connected Account models (merchant holds funds) | — |
 
-### Why does this matter?
+### Example: Create a merchant account
 
-Different verticals require different flows: `$0 Auth` for hotels, `3DS` for EU retail, `Recurring` for subscriptions. Without normalisation, platforms write separate handling logic for each PSP's quirks.
+```bash
+curl --request POST \
+  --url https://api.hyperswitch.io/accounts \
+  --header 'api-key: YOUR_API_KEY' \
+  --header 'content-type: application/json' \
+  --data '{
+    "merchant_id": "merchant_abc123",
+    "merchant_name": "Acme Store",
+    "merchant_details": {
+      "primary_contact_person": "John Doe",
+      "primary_email": "john@acmestore.com"
+    },
+    "metadata": {
+      "saas_tenant_id": "tenant_456"
+    }
+  }'
+```
 
 ---
 
-## What is the Payment Vault?
+## How does the unified state machine handle 3DS?
 
-The [Payment Vault](https://docs.hyperswitch.io/about-hyperswitch/payments-modules/vault) is a neutral tokenisation service that exists independently of any processor.
+Different verticals require different flows (e.g., $0 Auth for hotels, 3DS for EU retail, Recurring for subscriptions). Fragmentation across PSP capabilities (e.g., "Stripe supports 3DS, but does Authorize.net?") often forces platforms to write "spaghetti code."
 
-### How does portable tokenisation work?
+Juspay Hyperswitch normalises complex flows into a standard state machine. Your frontend handles a single response type, regardless of the underlying complexity.
 
-| Feature | Description |
+| Feature | Description | Reference |
+|---------|-------------|-----------|
+| Compliance Ready | Automatically handles 3D Secure (3DS) challenges across all processors | [3D Secure (3DS)](https://docs.hyperswitch.io/explore-hyperswitch/merchant-controls/payment-features/3d-secure-3ds) |
+| Unified Lifecycle | Perform Auth, Capture, and Void operations using a single API syntax | [Connector Payment Flows](https://docs.hyperswitch.io/learn-more/hyperswitch-architecture/connector-payment-flows) |
+
+---
+
+## Why should I use network tokenisation and the vault service?
+
+If a merchant stores card data in a PSP-specific vault (e.g., Stripe Customer ID), they are vendor-locked. Switching providers means losing all saved customer cards, which destroys recurring revenue.
+
+Juspay Hyperswitch offers a neutral [Payment Vault](https://docs.hyperswitch.io/about-hyperswitch/payments-modules/vault) that exists independently of the processor.
+
+| Benefit | Description |
 |---------|-------------|
-| Token Ownership | You or the account own the tokens, not the PSP |
-| Interoperability | A card saved via Stripe can be charged via Adyen using [Network Tokenisation](https://docs.hyperswitch.io/explore-hyperswitch/payment-orchestration/quickstart/tokenization-and-saved-cards) |
-| PCI-DSS Compliance | Offload compliance using certified secure storage |
+| Ownership | You or the merchant own the tokens, not the PSP. |
+| Interoperability | A card saved during a Stripe transaction can be seamlessly charged via Adyen later. |
+| Security | Offload PCI-DSS compliance by using our certified secure storage. |
 
-### What problem does this solve?
-
-When a merchant stores cards in a PSP-specific vault (e.g., Stripe Customer ID), switching providers means losing all saved cards. This locks in recurring revenue to a single vendor.
+**Reference**: [Network Tokenisation](https://docs.hyperswitch.io/explore-hyperswitch/payment-orchestration/quickstart/tokenization-and-saved-cards)
 
 ---
 
-## How does error code mapping work?
+## How does error code mapping improve observability?
 
-Juspay Hyperswitch maps thousands of PSP error codes into a [Standardised Error Reference](https://docs.hyperswitch.io/explore-hyperswitch/payment-experience/payment/web/error-codes). Your UI displays consistent messages regardless of the upstream provider.
+Support teams struggle when every PSP returns different error codes (e.g., "Do Not Honour" vs. "Refusal" vs. "Error 402"). Debugging requires deep knowledge of 10+ different vendor systems.
 
-### Example error mapping
+Juspay Hyperswitch translates the chaos of vendor responses into a clean, standardised language for your support and engineering teams.
 
-| PSP Error | Standardised Code |
-|-----------|-------------------|
-| "Do Not Honor" | `card_declined` |
-| "Refusal" | `card_declined` |
-| "Error 402" | `card_declined` |
-| "Card Expired" | `card_expired` |
-
-### Where can I view transaction logs?
-
-Use the [Operations Dashboard](https://docs.hyperswitch.io/explore-hyperswitch/account-management/analytics-and-operations) to view transaction logs, refunds, and disputes across all accounts and processors in one view.
+| Capability | Description | Reference |
+|------------|-------------|-----------|
+| Unified Errors | Maps thousands of PSP error codes into a Standardised Error Reference (e.g., `card_expired`) | [Error Codes](https://docs.hyperswitch.io/explore-hyperswitch/payment-experience/payment/web/error-codes) |
+| Single Source of Truth | View transaction logs, refunds, and disputes across all merchants and processors in one view | [Analytics and Operations](https://docs.hyperswitch.io/explore-hyperswitch/account-management/analytics-and-operations) |
 
 ---
 
-## How do normalised event streams work?
+## What are normalised event streams?
 
-Juspay Hyperswitch standardises Day-2 operations (refunds, disputes, webhooks) into a unified interface. Build one refund handler and one webhook listener — it works for all connected processors.
+The payment lifecycle doesn't end at "Checkout." SaaS platforms must also build portals for their merchants to handle Refunds, Disputes, and Webhooks. Building these operational interfaces is painful because every processor has a different API schema for refunds and a different JSON payload for webhooks.
 
-### What is standardised?
+Juspay Hyperswitch standardises the chaotic "Day 2" operations into a clean, unified interface. Your engineering team builds one refund handler and one webhook listener, and it works for all connected processors.
 
-| Event Type | Documentation |
-|------------|---------------|
-| Webhooks | [Standardised Webhook Schema](https://docs.hyperswitch.io/explore-hyperswitch/payment-orchestration/quickstart/webhooks) |
-| Disputes | [Disputes Lifecycle](https://docs.hyperswitch.io/explore-hyperswitch/account-management/disputes) |
-| Refunds/Voids | [Relay APIs](https://api-reference.hyperswitch.io/v1/relay/relay#relay-create) — trigger operations using `connector_resource_id` |
+| Feature | Description | Reference |
+|---------|-------------|-----------|
+| Universal Webhooks | Ingests disparate events and transforms them into a Standardised Webhook Schema | [Webhooks](https://docs.hyperswitch.io/explore-hyperswitch/payment-orchestration/quickstart/webhooks) |
+| Dispute Management | Normalises the Disputes Lifecycle so you can surface evidence submission flows in your SaaS control centre | [Disputes](https://docs.hyperswitch.io/explore-hyperswitch/account-management/disputes) |
+| Stateless Operations | Trigger refunds or voids using Relay APIs, even if the original payment wasn't processed through Juspay Hyperswitch | [Relay APIs](https://api-reference.hyperswitch.io/v1/relay/relay#relay-create) |
 
 ---
 
-## How does high-availability failover work?
+## How does high availability and automated failover work?
 
-Juspay Hyperswitch monitors processor health and can automatically failover traffic to healthy alternatives.
+Global SaaS platforms cannot afford downtime. When a processor like Stripe US-East experiences latency, your merchants blame *you*, not Stripe. Without granular visibility into processor performance, your engineering team is flying blind, unable to reroute traffic or uphold SLAs for Enterprise merchants.
 
-### What observability features are available?
+Juspay Hyperswitch treats payments as "Critical Infrastructure" and provides deep visibility into the health of your payment mesh, allowing you to proactively manage reliability.
 
-| Feature | Description |
-|---------|-------------|
-| Connector Health | Continuous monitoring of success rates and latency per processor |
-| Smart Router | Automatic failover when a provider degrades. See [Intelligent Routing](https://docs.hyperswitch.io/explore-hyperswitch/workflows/intelligent-routing) |
-| Open Telemetry | Standard [OTel Traces](https://github.com/juspay/hyperswitch/blob/main/docs/architecture.md#monitoring) for Datadog, Prometheus, or Grafana |
-| System Health API | Build internal status pages using the [System Health API](https://live.hyperswitch.io/api/health) |
+| Feature | Description | Reference |
+|---------|-------------|-----------|
+| Connector Health | Continuously monitors success rates and latency of every connected processor; automatic failover to healthy alternatives | [Smart Router](https://docs.hyperswitch.io/explore-hyperswitch/workflows/intelligent-routing) |
+| Open Telemetry | Emits standard OTel Traces for every request; pipe into Datadog, Prometheus, or Grafana | [Monitoring](https://github.com/juspay/hyperswitch/blob/main/docs/architecture.md#monitoring) |
+| System Status | Access the System Health API to build internal status pages for your support team | [System Health API](https://live.hyperswitch.io/api/health) |
 
 ---
 
 ## What's next?
 
-- [Set up multiple accounts and profiles](https://docs.hyperswitch.io/explore-hyperswitch/account-management/multiple-accounts-and-profiles)
-- [Configure intelligent routing](https://docs.hyperswitch.io/explore-hyperswitch/workflows/intelligent-routing)
-- [Implement webhooks](https://docs.hyperswitch.io/explore-hyperswitch/payment-orchestration/quickstart/webhooks)
-- [View supported connectors](https://juspay.io/integrations)
+Ready to get started? Here are the next steps:
+
+- [Set up multiple merchant accounts and profiles](https://docs.hyperswitch.io/explore-hyperswitch/account-management/multiple-accounts-and-profiles) — Configure your platform hierarchy
+- [Configure intelligent routing](https://docs.hyperswitch.io/explore-hyperswitch/workflows/intelligent-routing) — Set up smart routing rules for your merchants
+- [Implement webhooks](https://docs.hyperswitch.io/explore-hyperswitch/payment-orchestration/quickstart/webhooks) — Listen for payment events across all processors
+- [View supported connectors](https://juspay.io/integrations) — See the full list of integrated payment providers
