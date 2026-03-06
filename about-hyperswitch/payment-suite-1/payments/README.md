@@ -16,8 +16,6 @@ Process card payments with flexibility and security. Hyperswitch supports multip
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
-- [Prerequisites](#prerequisites)
 - [Core Concepts](#core-concepts)
 - [Payment Flows](#payment-flows)
   - [Instant Payment (Automatic Capture)](#1-instant-payment-automatic-capture)
@@ -26,108 +24,9 @@ Process card payments with flexibility and security. Hyperswitch supports multip
   - [3D Secure Authentication](#4-3d-secure-authentication-flow)
 - [Recurring Payments](#recurring-payments-and-payment-storage)
 - [Saved Payment Methods](#using-saved-payment-methods)
-- [Testing](#testing)
-- [API Reference](#api-reference)
-- [Webhooks](#webhooks)
-- [Troubleshooting](#troubleshooting)
-
----
-
-## Quick Start
-
-Get your first card payment processed in under 5 minutes:
-
-### Step 1: Create a Payment
-
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---header 'X-Idempotency-Key: unique-key-123' \
---data-raw '{
-    "amount": 10000,
-    "currency": "USD",
-    "customer_id": "cust_123",
-    "profile_id": "pro_abc123",
-    "email": "customer@example.com",
-    "description": "Test payment",
-    "confirm": false,
-    "capture_method": "automatic",
-    "return_url": "https://example.com/payment/complete"
-}'
-```
-
-**Response:**
-
-```json
-{
-    "payment_id": "pay_jXzPoRHB9PiYBZc5TD3A",
-    "client_secret": "pay_jXzPoRHB9PiYBZc5TD3A_secret",
-    "status": "requires_confirmation",
-    "amount": 10000,
-    "currency": "USD",
-    "customer_id": "cust_123",
-    "created": "2024-03-06T10:30:00.000Z"
-}
-```
-
-### Step 2: Confirm with Card Details (SDK)
-
-```javascript
-// Initialize Hyperswitch SDK
-const hyper = window.Hyper("YOUR_PUBLISHABLE_KEY");
-const widgets = hyper.widgets({ 
-    clientSecret: "pay_jXzPoRHB9PiYBZc5TD3A_secret" 
-});
-
-// Create and mount payment element
-const checkout = widgets.create("payment", {
-    layout: "tabs",
-    wallets: {
-        walletReturnUrl: "https://example.com/payment/complete"
-    }
-});
-checkout.mount("#payment-element");
-
-// Confirm payment
-const { error } = await hyper.confirmPayment({
-    elements: widgets,
-    confirmParams: {
-        return_url: "https://example.com/payment/complete"
-    }
-});
-```
-
-### Step 3: Handle the Result
-
-The customer is redirected to your `return_url` with the payment status. Check the status using:
-
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments/pay_jXzPoRHB9PiYBZc5TD3A' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY'
-```
-
----
-
-## Prerequisites
-
-Before integrating card payments, ensure you have:
-
-| Requirement | Description |
-|-------------|-------------|
-| **Hyperswitch Account** | Sign up at [app.hyperswitch.io](https://app.hyperswitch.io) |
-| **API Keys** | Generate API key and Publishable key from Dashboard → Developers → API Keys |
-| **Business Profile** | Create a business profile and configure at least one card processor (Stripe, Adyen, etc.) |
-| **PCI Compliance** | For SDK integration: SAQ A eligible. For direct API: SAQ D required. |
-
-### Environment URLs
-
-| Environment | Base URL |
-|-------------|----------|
-| Sandbox | `https://sandbox.hyperswitch.io` |
-| Production | `https://api.hyperswitch.io` |
+- [Status Flow Summary](#status-flow-summary)
+- [When to Use Which Flow](#when-to-use-which-flow)
+- [Related Documentation](#related-documentation)
 
 ---
 
@@ -192,61 +91,29 @@ Choose the right flow based on your business requirements:
 
 <figure><img src="../../../.gitbook/assets/image (39).png" alt="Instant Payment Flow"><figcaption>Instant payment with automatic capture</figcaption></figure>
 
-**API Flow:**
+#### Sequence Diagram
 
-```bash
-# Create and confirm in one request
-curl --location 'https://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---header 'X-Idempotency-Key: instant-pay-001' \
---data-raw '{
-    "amount": 5000,
-    "currency": "USD",
-    "confirm": true,
-    "capture_method": "automatic",
-    "customer_id": "cust_123",
-    "profile_id": "pro_abc123",
-    "payment_method": "card",
-    "payment_method_type": "credit",
-    "payment_method_data": {
-        "card": {
-            "card_number": "4242424242424242",
-            "card_exp_month": "12",
-            "card_exp_year": "2027",
-            "card_holder_name": "John Doe",
-            "card_cvc": "123"
-        }
-    },
-    "return_url": "https://example.com/complete"
-}'
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant M as Merchant
+    participant H as Hyperswitch
+    participant P as Processor
+
+    C->>M: Initiate checkout
+    M->>H: POST /payments<br/>(confirm: true, capture_method: automatic)
+    H->>H: Validate & route to processor
+    H->>P: Process payment
+    P-->>H: Payment result
+    H-->>M: Response (status: succeeded)
+    M-->>C: Order confirmation
 ```
 
-**Response:**
-
-```json
-{
-    "payment_id": "pay_abc123",
-    "status": "succeeded",
-    "amount": 5000,
-    "amount_received": 5000,
-    "currency": "USD",
-    "capture_method": "automatic",
-    "customer_id": "cust_123"
-}
-```
-
-**Required Fields:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `amount` | integer | Yes | Amount in smallest currency unit (cents) |
-| `currency` | string | Yes | Three-letter ISO currency code |
-| `confirm` | boolean | Yes | Set to `true` for instant payment |
-| `capture_method` | string | Yes | Set to `"automatic"` |
-| `payment_method` | string | Yes | `"card"` for card payments |
-| `payment_method_data` | object | Yes* | Card details (*or use SDK) |
+**Key Characteristics:**
+- Single API call to create and confirm payment
+- Funds captured immediately upon authorization
+- Best for digital goods, immediate service delivery
+- No additional capture step required
 
 ---
 
@@ -256,83 +123,34 @@ curl --location 'https://sandbox.hyperswitch.io/payments' \
 
 <figure><img src="../../../.gitbook/assets/image (42).png" alt="Manual Capture Flow"><figcaption>Authorize now, capture later</figcaption></figure>
 
-**Step 1: Create Authorization**
+#### Sequence Diagram
 
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount": 10000,
-    "currency": "USD",
-    "confirm": true,
-    "capture_method": "manual",
-    "customer_id": "cust_123",
-    "profile_id": "pro_abc123",
-    "payment_method": "card",
-    "payment_method_data": {
-        "card": {
-            "card_number": "4242424242424242",
-            "card_exp_month": "12",
-            "card_exp_year": "2027",
-            "card_holder_name": "John Doe",
-            "card_cvc": "123"
-        }
-    }
-}'
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant M as Merchant
+    participant H as Hyperswitch
+    participant P as Processor
+
+    C->>M: Initiate checkout
+    M->>H: POST /payments<br/>(confirm: true, capture_method: manual)
+    H->>P: Authorize payment
+    P-->>H: Authorization confirmed
+    H-->>M: Response (status: requires_capture)
+    M-->>C: Order confirmed (not charged yet)
+    
+    Note over M,P: Later: When order ships
+    M->>H: POST /payments/{id}/capture
+    H->>P: Capture funds
+    P-->>H: Capture confirmed
+    H-->>M: Response (status: succeeded)
 ```
 
-**Response:**
-
-```json
-{
-    "payment_id": "pay_manual_123",
-    "status": "requires_capture",
-    "amount": 10000,
-    "amount_capturable": 10000,
-    "amount_received": 0,
-    "capture_method": "manual"
-}
-```
-
-**Step 2: Capture Funds**
-
-```bash
-# Full capture
-curl --location 'https://sandbox.hyperswitch.io/payments/pay_manual_123/capture' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount_to_capture": 10000
-}'
-```
-
-**Partial Capture:**
-
-```bash
-# Capture partial amount
-curl --location 'https://sandbox.hyperswitch.io/payments/pay_manual_123/capture' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount_to_capture": 7500
-}'
-```
-
-**Response:**
-
-```json
-{
-    "payment_id": "pay_manual_123",
-    "status": "partially_captured",
-    "amount": 10000,
-    "amount_capturable": 2500,
-    "amount_received": 7500
-}
-```
+**Key Characteristics:**
+- Authorization holds funds on customer's card
+- Capture can be full or partial amount
+- Multiple partial captures supported with `manual_multiple`
+- Authorization typically expires after 7-10 days
 
 {% hint style="info" %}
 Learn more about [Manual Capture](manual-capture/) and [Overcapture](manual-capture/overcapture.md) for capturing amounts greater than the original authorization.
@@ -346,97 +164,42 @@ Learn more about [Manual Capture](manual-capture/) and [Overcapture](manual-capt
 
 <figure><img src="../../../.gitbook/assets/image (43).png" alt="Decoupled Flow"><figcaption>Create → Update → Confirm → Capture</figcaption></figure>
 
-**Step 1: Create Payment Intent**
+#### Sequence Diagram
 
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount": 15000,
-    "currency": "USD",
-    "confirm": false,
-    "customer_id": "cust_123",
-    "profile_id": "pro_abc123"
-}'
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant M as Merchant
+    participant H as Hyperswitch
+    participant P as Processor
+
+    C->>M: Start checkout (Step 1)
+    M->>H: POST /payments<br/>(confirm: false)
+    H-->>M: Payment intent created<br/>(client_secret, status: requires_confirmation)
+    
+    C->>M: Enter shipping info (Step 2)
+    M->>H: POST /payments/{id}<br/>(update shipping details)
+    H-->>M: Payment updated
+    
+    C->>M: Enter payment details (Step 3)
+    M->>H: POST /payments/{id}/confirm
+    H->>P: Process payment
+    P-->>H: Payment result
+    H-->>M: Response (status: processing/succeeded)
+    
+    alt Manual Capture
+        M->>H: POST /payments/{id}/capture
+        H-->>M: Capture confirmed
+    end
+    
+    M-->>C: Order confirmation
 ```
 
-**Response:**
-
-```json
-{
-    "payment_id": "pay_decoupled_123",
-    "client_secret": "pay_decoupled_123_secret",
-    "status": "requires_confirmation",
-    "amount": 15000,
-    "currency": "USD"
-}
-```
-
-**Step 2: Update Payment (Optional)**
-
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments/pay_decoupled_123' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount": 16000,
-    "shipping": {
-        "address": {
-            "line1": "123 Main St",
-            "city": "San Francisco",
-            "state": "CA",
-            "zip": "94105",
-            "country": "US"
-        }
-    }
-}'
-```
-
-**Step 3: Confirm Payment**
-
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments/pay_decoupled_123/confirm' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "payment_method": "card",
-    "payment_method_data": {
-        "card": {
-            "card_number": "4242424242424242",
-            "card_exp_month": "12",
-            "card_exp_year": "2027",
-            "card_holder_name": "John Doe",
-            "card_cvc": "123"
-        }
-    },
-    "return_url": "https://example.com/complete"
-}'
-```
-
-**Step 4: Capture (if manual)**
-
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments/pay_decoupled_123/capture' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount_to_capture": 16000
-}'
-```
-
-**Endpoints Summary:**
-
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /payments` | Create a new payment intent |
-| `POST /payments/{id}` | Update payment details |
-| `POST /payments/{id}/confirm` | Confirm and process payment |
-| `POST /payments/{id}/capture` | Capture authorized funds |
+**Key Characteristics:**
+- Payment intent created separately from confirmation
+- Allows incremental data collection
+- Supports both automatic and manual capture
+- Ideal for multi-page checkout flows
 
 ---
 
@@ -446,58 +209,45 @@ curl --location 'https://sandbox.hyperswitch.io/payments/pay_decoupled_123/captu
 
 <figure><img src="../../../.gitbook/assets/image (44).png" alt="3DS Flow"><figcaption>3D Secure customer authentication</figcaption></figure>
 
-**Request:**
+#### Sequence Diagram
 
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount": 20000,
-    "currency": "USD",
-    "confirm": true,
-    "capture_method": "automatic",
-    "authentication_type": "three_ds",
-    "customer_id": "cust_123",
-    "profile_id": "pro_abc123",
-    "payment_method": "card",
-    "payment_method_data": {
-        "card": {
-            "card_number": "4242424242424242",
-            "card_exp_month": "12",
-            "card_exp_year": "2027",
-            "card_holder_name": "John Doe",
-            "card_cvc": "123"
-        }
-    },
-    "return_url": "https://example.com/3ds-complete"
-}'
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant M as Merchant
+    participant H as Hyperswitch
+    participant P as Processor
+    participant I as Issuer Bank
+
+    C->>M: Initiate checkout
+    M->>H: POST /payments<br/>(authentication_type: three_ds)
+    H->>P: Initiate payment with 3DS
+    P->>I: Request authentication
+    I-->>P: Authentication required
+    P-->>H: 3DS challenge required
+    H-->>M: Response (status: requires_customer_action, next_action)
+    M-->>C: Redirect to 3DS authentication page
+    
+    C->>I: Complete authentication
+    I-->>P: Authentication result
+    P-->>H: Payment authorized
+    H-->>M: Webhook: payment_intent.succeeded
+    M-->>C: Order confirmation
 ```
 
-**Status Progression:**
+**Key Characteristics:**
+- Redirects customer to bank for authentication
+- Required for high-risk transactions
+- Supports both frictionless and challenge flows
+- Mandatory for PSD2 compliance in EU
 
+**Status Progression:**
 ```
 processing → requires_customer_action → succeeded
                     ↓
               (Customer completes 3DS)
                     ↓
               redirect to return_url
-```
-
-**Handling 3DS Response:**
-
-```javascript
-// Check payment status after 3DS redirect
-const result = await hyper.retrievePaymentIntent(clientSecret);
-
-if (result.paymentIntent.status === 'succeeded') {
-    // Payment successful
-} else if (result.paymentIntent.status === 'requires_customer_action') {
-    // Additional action needed
-} else if (result.paymentIntent.status === 'failed') {
-    // Handle failure
-}
 ```
 
 {% hint style="info" %}
@@ -512,53 +262,7 @@ Store payment methods for future use with customer consent.
 
 ### Saving Payment Methods
 
-**During Payment Creation:**
-
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount": 5000,
-    "currency": "USD",
-    "confirm": true,
-    "customer_id": "cust_123",
-    "profile_id": "pro_abc123",
-    "setup_future_usage": "off_session",
-    "payment_method": "card",
-    "payment_method_data": {
-        "card": {
-            "card_number": "4242424242424242",
-            "card_exp_month": "12",
-            "card_exp_year": "2027",
-            "card_holder_name": "John Doe",
-            "card_cvc": "123"
-        }
-    },
-    "customer_acceptance": {
-        "acceptance_type": "online",
-        "accepted_at": "2024-03-06T10:30:00Z",
-        "online": {
-            "ip_address": "192.168.1.1",
-            "user_agent": "Mozilla/5.0..."
-        }
-    }
-}'
-```
-
-**Response:**
-
-```json
-{
-    "payment_id": "pay_recurring_123",
-    "status": "succeeded",
-    "payment_method_id": "pm_stored_456",
-    "network_transaction_id": "ntid_789"
-}
-```
-
-### Understanding `setup_future_usage`
+When creating a payment, set `setup_future_usage` to indicate intent for storing the payment method:
 
 | Value | Use When | Example |
 |-------|----------|---------|
@@ -567,18 +271,11 @@ curl --location 'https://sandbox.hyperswitch.io/payments' \
 
 ### Customer Consent Capture
 
-For compliance with card network rules, you must capture explicit customer consent before storing payment methods:
+For compliance with card network rules, you must capture explicit customer consent before storing payment methods. The `customer_acceptance` object records:
 
-```json
-"customer_acceptance": {
-    "acceptance_type": "online",
-    "accepted_at": "2024-03-06T10:30:00Z",
-    "online": {
-        "ip_address": "192.168.1.1",
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
-}
-```
+- **Acceptance type**: How consent was obtained (online/offline)
+- **Timestamp**: When consent was given
+- **Online context**: IP address and user agent (for online consent)
 
 {% hint style="info" %}
 When using Hyperswitch SDK, `customer_acceptance` is automatically sent when the customer checks "Save card for future use".
@@ -590,55 +287,17 @@ When using Hyperswitch SDK, `customer_acceptance` is automatically sent when the
 
 <figure><img src="../../../.gitbook/assets/image (45).png" alt="Saved Payment Methods"><figcaption>Retrieve and use stored payment methods</figcaption></figure>
 
-### Step 1: List Saved Payment Methods
+### Retrieving Stored Payment Methods
 
-```bash
-curl --location 'https://sandbox.hyperswitch.io/customers/cust_123/payment_methods' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY'
-```
+Use the customer's stored payment methods endpoint to display saved cards. The response includes masked card details (last 4 digits, expiry) without exposing sensitive data.
 
-**Response:**
+### Using a Saved Payment Method
 
-```json
-{
-    "customer_payment_methods": [
-        {
-            "payment_method_id": "pm_stored_456",
-            "payment_method": "card",
-            "payment_method_type": "credit",
-            "card": {
-                "scheme": "visa",
-                "last4_digits": "4242",
-                "expiry_month": "12",
-                "expiry_year": "2027"
-            }
-        }
-    ]
-}
-```
+Reference the stored payment method using `payment_token` (the `payment_method_id`) in subsequent payment requests. This eliminates the need to collect card details again.
 
-### Step 2: Use Saved Payment Method
+### PCI Compliance and Tokenization
 
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount": 3000,
-    "currency": "USD",
-    "confirm": true,
-    "customer_id": "cust_123",
-    "profile_id": "pro_abc123",
-    "payment_method": "card",
-    "payment_token": "pm_stored_456"
-}'
-```
-
-### PCI Compliance and `payment_method_id`
-
-Storing `payment_method_id` (a secure token) instead of raw card data significantly reduces your PCI DSS scope. Hyperswitch handles sensitive card storage in a PCI-compliant vault.
+Storing `payment_method_id` (a secure token) instead of raw card data significantly reduces your PCI DSS scope:
 
 | Approach | PCI Scope | Description |
 |----------|-----------|-------------|
@@ -656,62 +315,54 @@ Always consult with a PCI QSA for your specific compliance requirements.
 
 <figure><img src="../../../.gitbook/assets/image (48).png" alt="CIT Flow"><figcaption>Customer-initiated transaction with card storage</figcaption></figure>
 
-**Use Case:** First-time subscription signup with immediate charge or free trial setup.
+#### Sequence Diagram
 
-{% hint style="info" %}
-Detailed CIT implementation guide available in [Recurring Payments documentation](recurring-payments.md).
-{% endhint %}
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant M as Merchant
+    participant H as Hyperswitch
+    participant P as Processor
+
+    C->>M: Subscribe / Sign up
+    M->>H: POST /payments<br/>(setup_future_usage: off_session, confirm: true)
+    H->>P: Process payment
+    P-->>H: Payment succeeded
+    H-->>M: Response (payment_method_id, network_transaction_id)
+    M->>M: Store tokens for future use
+    M-->>C: Subscription active
+```
+
+**Use Case:** First-time subscription signup with immediate charge or free trial setup.
 
 ### Merchant-Initiated Transaction (MIT) Execution
 
 <figure><img src="../../../.gitbook/assets/image (50).png" alt="MIT Flow"><figcaption>Merchant-initiated recurring charge</figcaption></figure>
 
-**MIT with Stored Payment Method:**
+#### Sequence Diagram
 
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount": 2999,
-    "currency": "USD",
-    "confirm": true,
-    "customer_id": "cust_123",
-    "profile_id": "pro_abc123",
-    "off_session": true,
-    "recurring_details": {
-        "type": "payment_method_id",
-        "data": "pm_stored_456"
-    }
-}'
+```mermaid
+sequenceDiagram
+    participant M as Merchant
+    participant H as Hyperswitch
+    participant P as Processor
+
+    Note over M: Scheduled billing cycle
+    M->>H: POST /payments<br/>(off_session: true, recurring_details)
+    H->>P: Process MIT with stored credentials
+    P-->>H: Payment result
+    H-->>M: Response (status: succeeded/failed)
+    
+    alt Success
+        M->>M: Update subscription status
+    else Failure
+        M->>M: Trigger dunning/retry logic
+    end
 ```
 
-**MIT with Network Transaction ID:**
-
-```bash
-curl --location 'https://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: YOUR_API_KEY' \
---data-raw '{
-    "amount": 2999,
-    "currency": "USD",
-    "confirm": true,
-    "customer_id": "cust_123",
-    "profile_id": "pro_abc123",
-    "off_session": true,
-    "recurring_details": {
-        "type": "network_transaction_id_and_card_details",
-        "data": {
-            "card_number": "4242424242424242",
-            "card_exp_month": "12",
-            "card_exp_year": "2027",
-            "network_transaction_id": "ntid_789"
-        }
-    }
-}'
-```
+**MIT can use either:**
+- **Stored Payment Method** (`payment_method_id`): Reference the tokenized card
+- **Network Transaction ID**: Use the network transaction ID from a previous CIT
 
 {% hint style="info" %}
 Learn more about [Recurring Payments](recurring-payments.md), including connector-agnostic MIT routing.
@@ -719,193 +370,38 @@ Learn more about [Recurring Payments](recurring-payments.md), including connecto
 
 ---
 
-## Testing
+## When to Use Which Flow
 
-### Test Card Numbers
+Use this decision matrix to select the appropriate payment flow for your use case:
 
-Use these cards in the sandbox environment:
+| Use Case | Recommended Flow | Capture Method | Key Parameters |
+|----------|-----------------|----------------|----------------|
+| Standard e-commerce checkout | Instant Payment | `automatic` | `confirm: true` |
+| Pre-orders / Backorders | Two-Step Manual | `manual` | `confirm: true`, capture later |
+| Multi-step checkout wizard | Decoupled Flow | Either | `confirm: false` initially |
+| High-value transactions (>€30) | 3D Secure | Either | `authentication_type: three_ds` |
+| Subscription signup | CIT Flow | `automatic` | `setup_future_usage: off_session` |
+| Recurring billing | MIT Flow | `automatic` | `off_session: true` |
+| Pay-per-use services | Manual Capture | `manual` | Charge after usage period |
+| Marketplace with holds | Manual Multiple | `manual_multiple` | Partial captures to seller |
 
-| Card Number | Brand | Scenario |
-|-------------|-------|----------|
-| `4242424242424242` | Visa | Successful payment |
-| `4000000000000002` | Visa | Generic decline |
-| `4000000000000127` | Visa | Insufficient funds |
-| `4000000000000069` | Visa | Expired card |
-| `4000000000000119` | Visa | Incorrect CVC |
-| `4000002500003155` | Visa | 3D Secure required |
-| `4000002760003184` | Visa | 3D Secure frictionless |
-| `5555555555554444` | Mastercard | Successful payment |
-| `378282246310005` | Amex | Successful payment |
+### Flow Selection Decision Tree
 
-### Testing Payment Flows
-
-**Test Instant Payment:**
-
-```bash
-# Should return status: succeeded
-curl -X POST 'https://sandbox.hyperswitch.io/payments' \
--H 'Content-Type: application/json' \
--H 'api-key: YOUR_API_KEY' \
--d '{
-    "amount": 1000,
-    "currency": "USD",
-    "confirm": true,
-    "capture_method": "automatic",
-    "payment_method": "card",
-    "payment_method_data": {
-        "card": {
-            "card_number": "4242424242424242",
-            "card_exp_month": "12",
-            "card_exp_year": "2027",
-            "card_cvc": "123"
-        }
-    }
-}'
 ```
-
-**Test 3D Secure Flow:**
-
-Use card `4000002500003155` and verify the status progresses through `requires_customer_action`.
-
-**Test Saved Payment Method:**
-
-1. Create payment with `setup_future_usage: "off_session"`
-2. Store the returned `payment_method_id`
-3. Create new payment using `payment_token: "pm_xxxxx"`
-
-**Test MIT Flow:**
-
-1. Complete a CIT with `setup_future_usage: "off_session"`
-2. Wait for payment to succeed
-3. Create MIT with `off_session: true` and the stored `payment_method_id`
-
----
-
-## API Reference
-
-### POST /payments
-
-Create a new payment intent.
-
-**Request Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `amount` | integer | Yes | Amount in smallest currency unit |
-| `currency` | string | Yes | Three-letter ISO currency code |
-| `confirm` | boolean | No | Confirm immediately (default: false) |
-| `capture_method` | string | No | `automatic`, `manual`, `manual_multiple`, `scheduled` |
-| `customer_id` | string | No | Customer identifier |
-| `profile_id` | string | Yes* | Business profile ID (*required if multiple profiles) |
-| `payment_method` | string | No | Payment method type |
-| `payment_method_data` | object | No* | Required if `confirm: true` and not using SDK |
-| `setup_future_usage` | string | No | `on_session` or `off_session` |
-| `authentication_type` | string | No | `no_three_ds` or `three_ds` |
-| `return_url` | string | No* | Required for 3DS and redirect flows |
-| `email` | string | No | Customer email |
-| `description` | string | No | Payment description |
-| `metadata` | object | No | Custom key-value pairs |
-
-**Response:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `payment_id` | string | Unique payment identifier |
-| `client_secret` | string | Secret for client-side confirmation |
-| `status` | string | Current payment status |
-| `amount` | integer | Payment amount |
-| `amount_capturable` | integer | Amount available to capture |
-| `amount_received` | integer | Amount successfully captured |
-| `currency` | string | Currency code |
-| `payment_method_id` | string | Stored payment method token |
-
-### POST /payments/{id}/confirm
-
-Confirm a pending payment intent.
-
-### POST /payments/{id}/capture
-
-Capture authorized funds.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `amount_to_capture` | integer | No | Amount to capture (defaults to full amount) |
-
-### GET /customers/{id}/payment_methods
-
-List stored payment methods for a customer.
-
----
-
-## Webhooks
-
-Subscribe to webhook events to receive real-time payment status updates.
-
-### Payment Events
-
-| Event | Description |
-|-------|-------------|
-| `payment_intent.requires_action` | Payment requires customer action (3DS) |
-| `payment_intent.succeeded` | Payment completed successfully |
-| `payment_intent.failed` | Payment failed |
-| `payment_intent.captured` | Funds captured |
-| `payment_intent.partially_captured` | Partial capture completed |
-| `payment_intent.cancelled` | Payment cancelled |
-
-### Webhook Payload Example
-
-```json
-{
-    "event_type": "payment_intent.succeeded",
-    "payment_id": "pay_abc123",
-    "status": "succeeded",
-    "amount": 10000,
-    "currency": "USD",
-    "created": "2024-03-06T10:30:00Z"
-}
+Is this a recurring/subscription payment?
+├── YES → Has customer completed initial CIT?
+│   ├── YES → Use MIT Flow (off_session: true)
+│   └── NO → Use CIT Flow (setup_future_usage: off_session)
+└── NO → Is customer present during checkout?
+    ├── NO → Error: Card payments require customer presence
+    └── YES → Do you need to authorize before capturing?
+        ├── YES → Use Two-Step Manual Capture
+        └── NO → Is this a multi-step checkout?
+            ├── YES → Use Decoupled Flow
+            └── NO → Does transaction require 3DS?
+                ├── YES → Use 3D Secure Flow
+                └── NO → Use Instant Payment
 ```
-
-Configure webhooks in Dashboard → Developers → Webhooks.
-
----
-
-## Troubleshooting
-
-### Common Errors
-
-| Error Code | Cause | Solution |
-|------------|-------|----------|
-| `payment_method_not_available` | Payment method not enabled for profile | Enable card payment method in Dashboard |
-| `connector_processing_failure` | Processor declined | Check card details or use different card |
-| `requires_customer_action` | 3DS or redirect required | Handle authentication flow |
-| `amount_exceeds_capturable` | Capture amount > authorized | Check `amount_capturable` before capture |
-| `payment_already_captured` | Duplicate capture request | Check payment status before capturing |
-| `idempotency_key_reused` | Same idempotency key, different payload | Use unique idempotency keys per request |
-
-### Debug Steps
-
-1. **Check Payment Status:**
-   ```bash
-   curl 'https://sandbox.hyperswitch.io/payments/{payment_id}' \
-   -H 'api-key: YOUR_API_KEY'
-   ```
-
-2. **Verify Profile Configuration:**
-   - Dashboard → Business Profiles → {profile} → Payment Methods
-   - Ensure "card" is enabled
-
-3. **Test with SDK:**
-   - Use Hyperswitch SDK to isolate integration issues
-
-4. **Check Webhook Logs:**
-   - Dashboard → Developers → Webhooks → Logs
-
-### Support
-
-- **Documentation:** [docs.hyperswitch.io](https://docs.hyperswitch.io)
-- **API Reference:** [api-reference.hyperswitch.io](https://api-reference.hyperswitch.io)
-- **Support Email:** support@hyperswitch.io
-- **Discord Community:** [Join here](https://discord.gg/hyperswitch)
 
 ---
 
@@ -925,3 +421,31 @@ Configure webhooks in Dashboard → Developers → Webhooks.
 | `failed` | Retry or alternate method | Yes |
 | `cancelled` | None | Yes |
 | `partially_captured` | Capture remaining (optional) | Yes |
+
+---
+
+## Related Documentation
+
+### Getting Started
+- [Quick Start Guide](../../getting-started/quick-start/) - Set up your first payment in 5 minutes
+- [API Keys Setup](../../getting-started/api-keys.md) - Generate and manage API credentials
+- [Business Profiles](../../getting-started/business-profiles.md) - Configure payment processors
+
+### Payment Flows
+- [Manual Capture](manual-capture/) - Deep dive into manual and partial capture
+- [Recurring Payments](recurring-payments.md) - Complete guide to CIT/MIT flows
+- [3DS Decision Manager](../../explore-hyperswitch/workflows/3ds-decision-manager.md) - Configure authentication rules
+
+### Integration
+- [Hyperswitch SDK](../../getting-started/hyperswitch-sdk.md) - Client-side integration guide
+- [Webhooks](../../webhooks/) - Real-time payment status updates
+- [Testing in Sandbox](../../getting-started/testing.md) - Test card numbers and scenarios
+
+### Reference
+- [API Reference](https://api-reference.hyperswitch.io) - Complete API documentation
+- [Error Codes](../../reference/error-codes.md) - Troubleshooting common issues
+- [PCI Compliance Guide](../../security/pci-compliance.md) - Compliance requirements
+
+### Support
+- [Discord Community](https://discord.gg/hyperswitch) - Get help from the community
+- [Support Email](mailto:support@hyperswitch.io) - Contact our support team
