@@ -93,21 +93,7 @@ Choose the right flow based on your business requirements:
 
 #### Sequence Diagram
 
-```mermaid
-sequenceDiagram
-    participant C as Customer
-    participant M as Merchant
-    participant H as Hyperswitch
-    participant P as Processor
-
-    C->>M: Initiate checkout
-    M->>H: POST /payments<br/>(confirm: true, capture_method: automatic)
-    H->>H: Validate & route to processor
-    H->>P: Process payment
-    P-->>H: Payment result
-    H-->>M: Response (status: succeeded)
-    M-->>C: Order confirmation
-```
+![Instant Payment Flow](../../../static/images/payment-flows/instant-payment-flow.png)
 
 **Key Characteristics:**
 - Single API call to create and confirm payment
@@ -125,26 +111,7 @@ sequenceDiagram
 
 #### Sequence Diagram
 
-```mermaid
-sequenceDiagram
-    participant C as Customer
-    participant M as Merchant
-    participant H as Hyperswitch
-    participant P as Processor
-
-    C->>M: Initiate checkout
-    M->>H: POST /payments<br/>(confirm: true, capture_method: manual)
-    H->>P: Authorize payment
-    P-->>H: Authorization confirmed
-    H-->>M: Response (status: requires_capture)
-    M-->>C: Order confirmed (not charged yet)
-    
-    Note over M,P: Later: When order ships
-    M->>H: POST /payments/{id}/capture
-    H->>P: Capture funds
-    P-->>H: Capture confirmed
-    H-->>M: Response (status: succeeded)
-```
+![Manual Capture Flow](../../../static/images/payment-flows/manual-capture-flow.png)
 
 **Key Characteristics:**
 - Authorization holds funds on customer's card
@@ -166,34 +133,7 @@ Learn more about [Manual Capture](manual-capture/) and [Overcapture](manual-capt
 
 #### Sequence Diagram
 
-```mermaid
-sequenceDiagram
-    participant C as Customer
-    participant M as Merchant
-    participant H as Hyperswitch
-    participant P as Processor
-
-    C->>M: Start checkout (Step 1)
-    M->>H: POST /payments<br/>(confirm: false)
-    H-->>M: Payment intent created<br/>(client_secret, status: requires_confirmation)
-    
-    C->>M: Enter shipping info (Step 2)
-    M->>H: POST /payments/{id}<br/>(update shipping details)
-    H-->>M: Payment updated
-    
-    C->>M: Enter payment details (Step 3)
-    M->>H: POST /payments/{id}/confirm
-    H->>P: Process payment
-    P-->>H: Payment result
-    H-->>M: Response (status: processing/succeeded)
-    
-    alt Manual Capture
-        M->>H: POST /payments/{id}/capture
-        H-->>M: Capture confirmed
-    end
-    
-    M-->>C: Order confirmation
-```
+![Decoupled Flow](../../../static/images/payment-flows/decoupled-flow.png)
 
 **Key Characteristics:**
 - Payment intent created separately from confirmation
@@ -211,29 +151,7 @@ sequenceDiagram
 
 #### Sequence Diagram
 
-```mermaid
-sequenceDiagram
-    participant C as Customer
-    participant M as Merchant
-    participant H as Hyperswitch
-    participant P as Processor
-    participant I as Issuer Bank
-
-    C->>M: Initiate checkout
-    M->>H: POST /payments<br/>(authentication_type: three_ds)
-    H->>P: Initiate payment with 3DS
-    P->>I: Request authentication
-    I-->>P: Authentication required
-    P-->>H: 3DS challenge required
-    H-->>M: Response (status: requires_customer_action, next_action)
-    M-->>C: Redirect to 3DS authentication page
-    
-    C->>I: Complete authentication
-    I-->>P: Authentication result
-    P-->>H: Payment authorized
-    H-->>M: Webhook: payment_intent.succeeded
-    M-->>C: Order confirmation
-```
+![3DS Authentication Flow](../../../static/images/payment-flows/3ds-auth-flow.png)
 
 **Key Characteristics:**
 - Redirects customer to bank for authentication
@@ -317,21 +235,7 @@ Always consult with a PCI QSA for your specific compliance requirements.
 
 #### Sequence Diagram
 
-```mermaid
-sequenceDiagram
-    participant C as Customer
-    participant M as Merchant
-    participant H as Hyperswitch
-    participant P as Processor
-
-    C->>M: Subscribe / Sign up
-    M->>H: POST /payments<br/>(setup_future_usage: off_session, confirm: true)
-    H->>P: Process payment
-    P-->>H: Payment succeeded
-    H-->>M: Response (payment_method_id, network_transaction_id)
-    M->>M: Store tokens for future use
-    M-->>C: Subscription active
-```
+![Recurring Payment Flow](../../../static/images/payment-flows/recurring-payment-flow.png)
 
 **Use Case:** First-time subscription signup with immediate charge or free trial setup.
 
@@ -341,24 +245,7 @@ sequenceDiagram
 
 #### Sequence Diagram
 
-```mermaid
-sequenceDiagram
-    participant M as Merchant
-    participant H as Hyperswitch
-    participant P as Processor
-
-    Note over M: Scheduled billing cycle
-    M->>H: POST /payments<br/>(off_session: true, recurring_details)
-    H->>P: Process MIT with stored credentials
-    P-->>H: Payment result
-    H-->>M: Response (status: succeeded/failed)
-    
-    alt Success
-        M->>M: Update subscription status
-    else Failure
-        M->>M: Trigger dunning/retry logic
-    end
-```
+![MIT Execution Flow](../../../static/images/payment-flows/mit-execution-flow.png)
 
 **MIT can use either:**
 - **Stored Payment Method** (`payment_method_id`): Reference the tokenized card
