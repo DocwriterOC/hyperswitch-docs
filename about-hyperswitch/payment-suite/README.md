@@ -5,111 +5,193 @@ icon: container-storage
 
 # Payments Suite
 
-Hyperswitch is built for teams that want engineering-grade control over payments.
+**TL;DR:** Juspay Hyperswitch gives you four modular components—SDK, Orchestration, Connectors, and Vault—that you can mix and match based on your compliance needs, performance requirements, and engineering capabilities. Choose between Client-Side SDK Payments for rapid implementation or Server-to-Server (S2S) Payments for granular control.
 
-To simplify architectural decisions, the ecosystem can be viewed as four independent building blocks.\
-By defining ownership of each block — Hyperswitch-managed, self-hosted, or third-party — you can design an architecture aligned with your compliance posture, performance requirements, and internal engineering capabilities.
+---
 
+## What is the Hyperswitch Payments Suite?
 
+Hyperswitch is built for teams that want engineering-grade control over payments. Rather than forcing you into a single architecture, it offers four independent building blocks that you can configure based on your specific requirements.
 
-### **The Four Core Components**
+You decide who owns each component: Hyperswitch manages it, you self-host it, or you use a third-party provider. This flexibility lets you design an architecture aligned with your compliance posture, performance requirements, and internal engineering capabilities.
 
-#### **The SDK (Frontend) :**&#x20;
+---
 
-The entry point for your payment flow. It resides in your frontend and is responsible for securely capturing sensitive payment information.
+## What are the Four Core Components?
 
-#### **Intelligent Routing & Orchestration (Backend) :**&#x20;
+| Component | Role | Ownership Options |
+|-----------|------|-------------------|
+| **SDK (Frontend)** | Entry point for your payment flow; securely captures sensitive payment information | Hyperswitch-hosted or self-hosted |
+| **Intelligent Routing & Orchestration (Backend)** | Manages payment lifecycle, executes routing logic, handles post-payment operations like refunds | Hyperswitch Cloud or self-hosted |
+| **Acquirer & Processor Connectivity (Connectors)** | Pipeline that translates transactions to payment processors (e.g., Stripe, Adyen, Worldpay) | Hyperswitch-managed connectors |
+| **Vault (Card Data Storage)** | Secure storage for card data enabling one-click and recurring payments | Hyperswitch Vault, external vault, or self-hosted |
 
-The core of the operation. It manages the payment lifecycle, executes routing logic, and handles post-payment operations like refunds.
+### How do the components work together?
 
-#### **Acquirer & Processor Connectivity (Connectors) :**
+Each component operates independently but integrates seamlessly. For example, you might use Hyperswitch's SDK and Orchestration whilst connecting your own external vault for card data storage. This modular approach means you can adopt Hyperswitch incrementally without rewriting your entire payments infrastructure.
 
-The actual pipelines that translates the transaction (e.g., Stripe, Adyen, Worldpay).
+**External vault integration:** You can connect external vaults to Hyperswitch orchestration if you need to maintain your existing card data storage. See [Connect External Vaults to Hyperswitch Orchestration](https://docs.hyperswitch.io/explore-hyperswitch/workflows/vault/connect-external-vaults-to-hyperswitch-orchestration) for details.
 
-#### **Vault (Card Data Storage) :**&#x20;
+---
 
-The secure locker for sensitive card data to enable "One-Click" recurring payments without the user re-entering details.
+## Which Integration Model Should You Choose?
 
+The key decision is: **Who controls the payment execution?**
 
+| Integration Model | Execution Control | Tokenisation Timing | Best For |
+|------------------|-------------------|---------------------|----------|
+| **Client-Side SDK Payments** | SDK-initiated | Post-payment | Rapid checkout, frontend-driven experiences |
+| **Server-to-Server (S2S) Payments** | Backend-controlled | Pre-payment | Granular control, complex orchestration |
 
-Each Component can be handled by Hyperswitch, managed or self-deployed by your own team, or even sourced from a third-party provider e.g. Vault ([reference](https://docs.hyperswitch.io/~/revisions/wA01t1OV6BPUckMZ2Pvg/explore-hyperswitch/workflows/vault/connect-external-vaults-to-hyperswitch-orchestration))
+---
 
-***
+## How does Client-Side SDK Payments work?
 
-### Integration Architecture
+**When to choose this model:**
+- You want dynamic, frontend-driven payment experiences
+- You prefer minimal backend orchestration logic
+- You want SDK-triggered payment confirmation
+- You are optimising for rapid checkout implementation
 
-With the components defined, the next step is to select your integration architecture. This choice hinges on a single question:  Who controls the payment execution ?
+**Prerequisites:**
+- Hyperswitch account with API keys
+- Payment processor configured in your dashboard
+- Frontend application capable of loading the SDK
 
-Choose the integration method that best aligns with your payment flow requirements:
+### Flow diagram
 
-#### Integration Model 1: Client-Side SDK Payments
+```mermaid
+sequenceDiagram
+    participant M as Merchant Backend
+    participant SDK as Payment SDK
+    participant HS as Hyperswitch Backend
+    participant PSP as Payment Processor
 
-(Tokenize Post-Payment | SDK-Initiated Execution)
+    M->>HS: POST /payments (create payment)
+    HS-->>M: Return client_secret
+    M->>SDK: Load SDK with client_secret
+    SDK->>SDK: Collect payment details
+    SDK->>HS: Confirm payment
+    HS->>HS: Apply routing logic
+    HS->>PSP: Send to configured processor
+    PSP-->>HS: Return status
+    HS-->>SDK: Return final status
+    SDK-->>M: Payment complete callback
+```
 
-#### When to Choose This Model
+### Implementation steps
 
-* You want dynamic, frontend-driven payment experiences
-* You prefer minimal backend orchestration logic
-* You want SDK-triggered payment confirmation
-* You are optimizing for rapid checkout implementation
+1. **Create a payment:** Call the [`/payments`](https://api-reference.hyperswitch.io/v1/payments/payments--create) API from your backend to create a payment and receive a `client_secret`.
 
-#### High-level Flow
+2. **Load the SDK:** Initialise the [Payment SDK](https://docs.hyperswitch.io/explore-hyperswitch/payment-experience/payment) in your frontend with the `client_secret`.
 
-1. Merchant will call the [/payments](https://api-reference.hyperswitch.io/v1/payments/payments--create) API and load the [Payment SDK](https://docs.hyperswitch.io/explore-hyperswitch/payment-experience/payment).
-2. SDK securely collects payment details.
-3. SDK triggers payment confirmation.
-4. SDK communicates with Hyperswitch backend.
-5. Hyperswitch:
-   * Applies [routing logic](https://docs.hyperswitch.io/~/revisions/iPtyU5MKxmgIsGywgRhI/explore-hyperswitch/workflows/intelligent-routing)
-   * Sends request to configured PSP
-   * Manages authorization/capture
-   * Returns final payment status
+3. **Collect payment details:** The SDK securely collects the customer's payment information.
 
-***
+4. **Confirm payment:** The SDK triggers payment confirmation and communicates with Hyperswitch backend.
 
-#### Integration Model 2: Server-to-Server (S2S) Payments
+5. **Hyperswitch processes:** Hyperswitch applies [routing logic](https://docs.hyperswitch.io/explore-hyperswitch/workflows/intelligent-routing), sends the request to the configured payment service provider (PSP), manages authorisation and capture, and returns the final payment status.
 
-(Tokenize Pre-Payment | Backend-Controlled Execution)
+---
 
-#### When to Choose This Model
+## How does Server-to-Server (S2S) Payments work?
 
-* You want granular control over transaction timing
-* You require backend-driven orchestration logic
-* You want to tokenize credentials before execution
-* You prefer decoupling vaulting from transaction processing
+**When to choose this model:**
+- You want granular control over transaction timing
+- You require backend-driven orchestration logic
+- You want to tokenise credentials before execution
+- You prefer decoupling vaulting from transaction processing
 
-#### High-level Flow
+**Prerequisites:**
+- Hyperswitch account with API keys
+- Payment processor configured in your dashboard
+- Backend application with server-side capabilities
 
-**Tokenisze Card :**&#x20;
+### Flow diagram
 
-* Tokenize payment credentials using - [Vault SDK](https://docs.hyperswitch.io/explore-hyperswitch/payment-experience/payment-method/web) or backend call to [/payment-methods](https://api-reference.hyperswitch.io/v2/payment-methods/payment-method--create-v1)
-*   Hyperswitch securely stores the credential and returns a reusable identifier - `payment_method_id`.
+```mermaid
+sequenceDiagram
+    participant M as Merchant Backend
+    participant HS as Hyperswitch Backend
+    participant V as Vault
+    participant PSP as Payment Processor
 
+    M->>HS: Tokenise card (Vault SDK or /payment-methods)
+    HS->>V: Store credentials securely
+    V-->>HS: Return payment_method_id
+    HS-->>M: Return payment_method_id
+    
+    Note over M: Later: Ready to process payment
+    
+    M->>HS: POST /payments with payment_method_id
+    HS->>HS: Apply routing logic
+    HS->>PSP: Send to configured processor
+    PSP-->>HS: Return status
+    HS-->>M: Return final status
+```
 
+### Implementation steps
 
-**Trigger Payment Execution :**&#x20;
+#### Step 1: Tokenise the card
 
-*   Option A: Process via Hyperswitch Orchestration by calling /payments API.
+Tokenise payment credentials using one of these methods:
+- **Vault SDK:** Use the [Vault SDK](https://docs.hyperswitch.io/explore-hyperswitch/payment-experience/payment-method/web) in your frontend
+- **Backend API:** Call [`/payment-methods`](https://api-reference.hyperswitch.io/v2/payment-methods/payment-method--create-v1) from your backend
 
-    *   Use this option if you want Hyperswitch to:
+Hyperswitch securely stores the credential and returns a reusable identifier: `payment_method_id`.
 
-        * Apply [routing logic](https://docs.hyperswitch.io/~/revisions/iPtyU5MKxmgIsGywgRhI/explore-hyperswitch/workflows/intelligent-routing)
-        * Select the optimal connector
-        * Manage [retries](https://docs.hyperswitch.io/~/revisions/iPtyU5MKxmgIsGywgRhI/explore-hyperswitch/workflows/smart-retries) and failover
-        * Handle authorization and capture lifecycle
+#### Step 2: Trigger payment execution
 
-        This is the recommended model for merchants adopting Hyperswitch orchestration.
+You have two options for processing the payment:
 
+**Option A: Process via Hyperswitch Orchestration**
 
-* Option B: Process via Proxy API by calling [/proxy](https://docs.hyperswitch.io/~/revisions/wbGQKlHTQ8NT2yPUGcD2/about-hyperswitch/payment-suite-1/payment-method-card/proxy) API.&#x20;
-  *   Use this option if:
+Call the `/payments` API with your `payment_method_id`. Choose this option if you want Hyperswitch to:
+- Apply [routing logic](https://docs.hyperswitch.io/explore-hyperswitch/workflows/intelligent-routing)
+- Select the optimal connector
+- Manage [retries](https://docs.hyperswitch.io/explore-hyperswitch/workflows/smart-retries) and failover
+- Handle authorisation and capture lifecycle
 
-      * You do not want to change your existing PSP integration immediately
-      * You want Hyperswitch to act as a passthrough layer
-      * You are incrementally migrating to full orchestration
+This is the recommended model for merchants adopting Hyperswitch orchestration.
 
-      In this mode:
+**Option B: Process via Proxy API**
 
-      * Your existing integration contract remains unchanged
-      * Hyperswitch forwards requests to the configured processor
-      * You can progressively enable routing and orchestration features
+Call the [`/proxy`](https://docs.hyperswitch.io/about-hyperswitch/payment-suite-1/payment-method-card/proxy) API. Choose this option if:
+- You do not want to change your existing PSP integration immediately
+- You want Hyperswitch to act as a passthrough layer
+- You are incrementally migrating to full orchestration
+
+In this mode:
+- Your existing integration contract remains unchanged
+- Hyperswitch forwards requests to the configured processor
+- You can progressively enable routing and orchestration features
+
+---
+
+## How do you choose between the integration models?
+
+Use this decision matrix to select the right model for your use case:
+
+| Your Requirement | Recommended Model |
+|-----------------|-------------------|
+| Fastest time to market | Client-Side SDK |
+| Frontend-driven checkout | Client-Side SDK |
+| Minimal backend changes | Client-Side SDK |
+| Need to tokenise before payment | S2S Payments |
+| Complex orchestration logic | S2S Payments |
+| Incremental migration from existing PSP | S2S with Proxy API |
+| Full orchestration adoption | S2S with Orchestration |
+
+---
+
+## What's next?
+
+- **Get started:** [Sign up](https://app.hyperswitch.io/) and try a test payment
+- **Integration guide:** Follow the [step-by-step integration guide](https://docs.hyperswitch.io/hyperswitch-cloud/integration-guide)
+- **API reference:** Explore the [full API documentation](https://api-reference.hyperswitch.io/introduction)
+- **Configure routing:** Set up [intelligent routing](https://docs.hyperswitch.io/explore-hyperswitch/workflows/intelligent-routing) for your connectors
+
+---
+
+## Need help?
+
+Join our [Slack Community](https://inviter.co/hyperswitch-slack) to ask questions, share feedback, and collaborate with other developers. For direct support, use our [Contact Us](https://hyperswitch.io/contact-us) page.

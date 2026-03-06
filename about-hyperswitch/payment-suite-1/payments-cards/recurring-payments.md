@@ -1,218 +1,439 @@
+# Recurring Payments
+
+> **TL;DR:** Set up flexible, compliant recurring payments with Hyperswitch using CIT/MIT flows. Charge immediately or validate cards for later, then process merchant-initiated transactions across any supported connector using network transaction IDs—eliminating PSP lock-in.
+
+## What You'll Learn
+
+- How to set up recurring payments using Customer-Initiated Transactions (CIT)
+- When to use charge vs zero-dollar authorisation flows
+- How to execute Merchant-Initiated Transactions (MIT) for subsequent payments
+- How connector-agnostic routing enables payment processor flexibility
+
 ---
-icon: arrows-rotate-reverse
+
+## Overview
+
+Recurring payments via Hyperswitch enable you to charge customers on a flexible schedule without being tied to fixed amounts or billing cycles. The implementation follows a two-phase model: first, you capture customer consent through a Customer-Initiated Transaction (CIT), then you process subsequent charges through Merchant-Initiated Transactions (MITs).
+
+This approach gives you complete control over billing timing and amounts whilst maintaining compliance with card scheme requirements for stored credential transactions.
+
 ---
 
-# Recurring payments
+## CIT vs MIT: Understanding the Difference
 
-Recurring payments via Hyperswitch can be setup by passing some additional flags, as highligted below. The recurring payments are not tied to a specific amount or cycle and the merchant can charge the end-user as per their own business requirements.&#x20;
+| Aspect | Customer-Initiated Transaction (CIT) | Merchant-Initiated Transaction (MIT) |
+|--------|--------------------------------------|--------------------------------------|
+| **Who initiates** | Customer actively participates | Merchant triggers automatically |
+| **Customer presence** | Customer is on-session (present) | Customer is off-session (not present) |
+| **Purpose** | Set up mandate + optional first charge | Process subsequent recurring charges |
+| **Authentication** | Full SCA/3DS authentication required | Uses stored credentials from CIT |
+| **API flag** | `setup_future_usage: "off_session"` | `off_session: true` |
+| **Compliance** | Captures customer consent explicitly | Relies on consent captured during CIT |
 
-### Programmatic Card-on-File Setup with Immediate Charge (CIT + Save)
+---
 
-When setting up subscription there are two distinct implementation flows. The correct flow depends on whether you intend to charge the customer immediately or simply validate their details for later use.
+## Phase 1: Setting Up Recurring Payments (CIT)
 
-#### 1. The Setup with Charge Flow
+When establishing a recurring payment arrangement, you must first complete a Customer-Initiated Transaction. This transaction captures the customer's consent to store their payment method for future off-session charges. The CIT serves as the foundation for all subsequent MIT payments and must be completed with the customer present.
 
-**Use Case:** Use this when you need to collect a payment immediately (e.g., the first month of a subscription or a setup fee) while simultaneously saving the card details for future automatic charges. For this call Payments API with the below configuration parameters.
+There are two implementation flows for the CIT phase, each suited to different business scenarios.
 
-**Required API Configuration**
+### Option 1: CIT with Immediate Charge
 
-Include below parameter and values while calling the [payments](https://api-reference.hyperswitch.io/v1/payments/payments--create) API.
+**When to use this flow:** Use this approach when you need to collect payment immediately whilst simultaneously saving card details for future automatic charges. Common scenarios include the first month of a subscription, a setup fee, or an initial purchase that precedes a recurring service.
 
-| Parameter            | Value                  |
-| -------------------- | ---------------------- |
-| `amount`             | >0 (Greater than zero) |
-| `setup_future_usage` | `off_session`          |
+**How it works:** You create a payment with a non-zero amount and set `setup_future_usage` to `off_session`. The customer completes authentication (including 3DS if required), their payment method is stored, and you receive both the payment and a `payment_method_id` for future charges.
 
-**Run-Ready API Example (CIT with Charge)**
+#### Required Parameters
 
-```json
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `amount` | > 0 | Any positive value in minor units (e.g., 6540 = $65.40) |
+| `setup_future_usage` | `"off_session"` | Signals intent to store payment method for MIT |
+| `customer_id` | Your identifier | Links payment method to a specific customer |
+| `return_url` | Valid URL | Required for 3DS redirect handling |
+
+#### API Example
+
+```bash
 curl --location 'https://sandbox.hyperswitch.io/payments' \
 --header 'Content-Type: application/json' \
 --header 'Accept: application/json' \
---header 'api-key: <enter your Hyperswitch API key here>' \
+--header 'api-key: YOUR_API_KEY' \
 --data-raw '{
     "amount": 6540,
     "currency": "USD",
-    "profile_id": <enter the relevant profile id>,
-    "setup_future_usage":"off_session", 
+    "profile_id": "YOUR_PROFILE_ID",
+    "setup_future_usage": "off_session",
     "customer_id": "customer123",
-    "description": "Its my first payment request",
-    "return_url": "https://example.com", // 
+    "description": "Initial subscription payment",
+    "return_url": "https://example.com/return"
 }'
 ```
 
+#### CIT with Charge Flow
 
+```mermaid
+sequenceDiagram
+    participant M as Merchant
+    participant H as Hyperswitch
+    participant C as Connector (PSP)
+    participant CU as Customer
+    participant CB as Card Brand
 
-#### 2. Zero Dollar Authorization (Mandate-Only Setup)
+    M->>H: POST /payments (amount > 0, setup_future_usage=off_session)
+    H->>C: Create payment with mandate setup
+    C->>CU: 3DS authentication challenge
+    CU->>C: Complete authentication
+    C->>CB: Authorise and store credentials
+    CB-->>C: Network Transaction ID (NTID)
+    C-->>H: Payment success + PM ID + NTID
+    H-->>M: payment_method_id + network_transaction_id
+    
+    Note over M,H: Store payment_method_id for future MITs
+```
 
-**Use Case:** Use this for free trials, pay-later models, or delayed billing. This flow validates the payment method details without charging the customer's card.
+---
 
-**Required API Configuration**
+### Option 2: Zero Dollar Authorisation (Mandate-Only Setup)
 
-Pass below parameters while calling payments API for [Zero Dollar Auth ](https://docs.hyperswitch.io/explore-hyperswitch/payment-orchestration/quickstart/tokenization-and-saved-cards/zero-amount-authorization-1)&#x20;
+**When to use this flow:** Use this approach for free trials, pay-later models, or scenarios where you need to validate a payment method without charging the customer. This flow confirms the card is valid and sets up the mandate for future charges.
 
-| Parameter            | Value          |
-| -------------------- | -------------- |
-| `setup_future_usage` | `off_session`  |
-| `amount`             | `0`            |
-| `payment_type`       | `payment_type` |
+**How it works:** You create a zero-amount authorisation request that validates the payment method details. The customer completes authentication, and you receive a `payment_method_id` for future MIT charges—without any money changing hands.
 
-**Run-Ready API Example (Zero Auth Mandate)**
+#### Required Parameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `amount` | `0` | Zero amount for validation only |
+| `setup_future_usage` | `"off_session"` | Signals intent to store payment method |
+| `payment_type` | `"payment_type"` | Required for zero-dollar auth |
+
+#### API Example
+
+```bash
+curl --location 'https://sandbox.hyperswitch.io/payments' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'api-key: YOUR_API_KEY' \
+--data-raw '{
+    "amount": 0,
+    "currency": "USD",
+    "confirm": false,
+    "customer_id": "trial_customer_001",
+    "email": "customer@example.com",
+    "name": "John Doe",
+    "phone": "9999999999",
+    "phone_country_code": "+1",
+    "description": "Free trial mandate setup",
+    "profile_id": "YOUR_PROFILE_ID",
+    "setup_future_usage": "off_session"
+}'
+```
+
+#### Zero Dollar Auth Flow
+
+```mermaid
+sequenceDiagram
+    participant M as Merchant
+    participant H as Hyperswitch
+    participant C as Connector (PSP)
+    participant CU as Customer
+    participant CB as Card Brand
+
+    M->>H: POST /payments (amount=0, setup_future_usage=off_session)
+    H->>C: Zero dollar authorisation
+    C->>CU: 3DS authentication (if required)
+    CU->>C: Complete authentication
+    C->>CB: Validate card + store credentials
+    CB-->>C: Network Transaction ID (NTID)
+    C-->>H: Authorisation success + PM ID + NTID
+    H-->>M: payment_method_id + network_transaction_id
+    
+    Note over M,H: No charge applied - mandate established
+```
+
+---
+
+## What You Receive After a Successful CIT
+
+Upon successful completion of either CIT flow, Hyperswitch returns critical identifiers that enable subsequent MIT processing.
+
+### The `payment_method_id`
+
+This identifier uniquely maps to a specific combination of customer and payment instrument. A single customer can have multiple payment methods, each with its own ID, but the same payment instrument for the same customer always resolves to the same `payment_method_id`.
+
+| Customer ID | Payment Instrument | Payment Method ID |
+|-------------|-------------------|-------------------|
+| `cust_123` | Visa ending in 4242 | `pm_Visa_4242_123` |
+| `cust_123` | Mastercard ending in 1111 | `pm_MC_1111_123` |
+| `cust_456` | Visa ending in 4242 | `pm_Visa_4242_456` |
+| `cust_123` | PayPal (user@email.com) | `pm_PP_123` |
+
+Internally, Hyperswitch maps the `payment_method_id` to various credentials including PSP tokens, raw card data with NTID, and network tokens—depending on your merchant configuration.
+
+### The `network_transaction_id` (NTID)
+
+The Network Transaction ID serves as a chaining identifier that links the original CIT to subsequent MIT payments. This identifier enables connector-agnostic routing and cross-processor MIT execution, which is essential for payment processor flexibility.
+
+---
+
+## Customer Consent Capture (Mandate Compliance)
+
+Capturing customer consent is a regulatory requirement for storing payment methods. The approach differs depending on your integration method.
+
+### Using Hyperswitch SDK
+
+The SDK handles consent capture automatically. When customers click the "Save card" checkbox, the SDK includes `customer_acceptance` in the confirm request. Enable this functionality by setting `displaySavedPaymentMethodsCheckbox: true` during SDK integration.
+
+### Without SDK (Direct API Integration)
+
+You must explicitly provide customer acceptance details in your confirm request:
 
 ```json
-curl --location 'http://sandbox.hyperswitch.io/payments' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'api-key: <enter your Hyperswitch API key here>' \
---data-raw '{
-"amount": 0,
-"currency": "USD",
-"confirm": false,
-"customer_id": "zero_auth_test_customer",
-"email": "m.arjunkarthik@gmail.com",
-"name": "John Doe",
-"phone": "999999999",
-"phone_country_code": "+1",
-"description": "Its my first payment request",
-"profile_id": <enter the relevant profile id>,
-"setup_future_usage": "off_session"
-}'
-```
-
-Once the CIT is successful, Hyperswitch returns a `payment_method_id` . This `payment_method_id`  can be used by the merchant for all subsequent MIT recurring payments. Hyperswitch also returns the `network_transction_id`  (NTID) in its response to allow PICI compliant merchants to direct pass card + NTID for processing MIT recurring payments&#x20;
-
-The `payment_method_id` serves as a unique identifier mapped to a specific combination of a Customer ID and a unique Payment Instrument (e.g., a specific credit card, digital wallet, or bank account).  A single customer can have multiple payment methods, each assigned a distinct ID. However, the same payment instrument used by the same customer will always resolve to the same `payment_method_id`.  This uniqueness applies across all payment types, including cards, wallets, and bank details.
-
-For example, you can refer the below table -&#x20;
-
-| **Customer ID** | **Payment Instrument**            | **Payment Method ID** |
-| --------------- | --------------------------------- | --------------------- |
-| 123             | Visa ending in 4242               | `PM1`                 |
-| 123             | Mastercard ending in 1111         | `PM2`                 |
-| 456             | Visa ending in 4242               | `PM3`                 |
-| 123             | PayPal Account (`user@email.com`) | `PM4`                 |
-
-Internally the payment\_method\_id is mapped to a bunch of credentials -  PSP token, Raw card + NTID, Network token + NTID depending on functionalities enabled for the merchant.
-
-
-
-### Customer Consent Capture (Mandate Compliance)
-
-If you are not using Hyperswitch SDK, then `customer_acceptance`  (customer's consent)is required along with the other parameters [confirm](https://api-reference.hyperswitch.io/v1/payments/payments--confirm) request to store the card.
-
-```bash
-"customer_acceptance": {
+{
+    "customer_acceptance": {
         "acceptance_type": "online",
-        "accepted_at": "1963-05-03T04:07:52.723Z",
+        "accepted_at": "2026-03-06T10:30:00.000Z",
         "online": {
-            "ip_address": "in sit",
-            "user_agent": "amet irure esse"
+            "ip_address": "192.168.1.100",
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         }
     }
+}
 ```
 
-If you are using the Hyperswitch SDK, the `customer_acceptance` is sent in the [confirm](https://api-reference.hyperswitch.io/v1/payments/payments--confirm) request on the basis of customer clicking the save card radio button
+---
 
-**Note:** Ensure to enable this functionality using the [_displaySavedPaymentMethodsCheckbox_](https://docs.hyperswitch.io/hyperswitch-cloud/integration-guide/web/customization#id-6.-handle-saved-payment-methods) property during SDK integration
+## Phase 2: Executing Merchant-Initiated Transactions (MIT)
 
-***
+Once you've completed a CIT and stored the payment method, you can process subsequent charges without customer interaction. MITs are initiated by your system using the credentials established during the CIT.
 
-### Merchant-Initiated Transactions (MIT) – Decoupled Execution
+Hyperswitch supports decoupled transaction flows, allowing MITs to be processed independently of the original CIT—even when that CIT occurred outside Hyperswitch.
 
-Hyperswitch supports decoupled transaction flows, allowing Merchant-Initiated Transactions (MITs) to be processed independently of the original Customer-Initiated Transaction (CIT), even when the CIT was completed outside the Hyperswitch platform.
+### Required Parameters for MIT
 
-MITs are initiated by invoking the [`/payments`](https://api-reference.hyperswitch.io/v1/payments/payments--create) API with `off_session: true` and providing the available reference data in the `recurring_details` object. Depending on the artifacts available in your system, one of the following approaches can be used:
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `off_session` | `true` | Indicates merchant-initiated transaction |
+| `recurring_details` | Object | Contains reference to stored credentials |
 
-#### [**Payment Method ID**](https://api-reference.hyperswitch.io/v1/payments/payments--confirm#body-recurring-details)
+### MIT Execution Methods
 
-Submit the Hyperswitch generated payment\_method\_id to process the MIT transaction. Depending on the merchant configurations the MIT will be processed with the same PSP or with a different PSP.&#x20;
+Depending on what credentials you have available, choose the appropriate method:
 
-#### [**Processor Payment Token**](https://api-reference.hyperswitch.io/v1/payments/payments--confirm#option-3)&#x20;
+#### Method 1: Payment Method ID (Recommended)
 
-&#x20;Submit a processor-issued token that represents the previously authorized payment instrument.
+Submit the Hyperswitch-generated `payment_method_id` from the original CIT:
 
-#### [**Network Transaction ID with Card Data**](https://api-reference.hyperswitch.io/v1/payments/payments--confirm#option-4)&#x20;
+```json
+{
+    "amount": 2999,
+    "currency": "USD",
+    "customer_id": "customer123",
+    "off_session": true,
+    "recurring_details": {
+        "payment_method_id": "pm_Visa_4242_123"
+    }
+}
+```
 
-&#x20;Provide the original network transaction identifier along with the associated primary card data required for authorization.
+#### Method 2: Processor Payment Token
 
-{% hint style="info" %}
-⚠️ **PSP Configuration Required**
+Submit a processor-issued token directly:
 
-This feature is not enabled by default and must be explicitly enabled by PSP.
+```json
+{
+    "amount": 2999,
+    "currency": "USD",
+    "off_session": true,
+    "recurring_details": {
+        "processor_payment_token": "tok_live_abc123xyz"
+    }
+}
+```
 
-You may receive errors such as `Received unknown parameter: payment_method_options[card][mit_exemption]`, follow the steps below to request activation.
+#### Method 3: Network Transaction ID with Card Data
 
-Email the PSP Support requesting:
+Provide the NTID along with card details for cross-processor MIT:
 
-* Access to the `mit_exemption` parameter for MIT (Merchant Initiated Transaction) payments
-* Ability to pass `network_transaction_id` in the parameter: `payment_method_options[card][mit_exemption][network_transaction_id]`
-* Explain your use case: enabling cross-processor MIT payments using network transaction IDs from card schemes
+```json
+{
+    "amount": 2999,
+    "currency": "USD",
+    "off_session": true,
+    "payment_method": "card",
+    "payment_method_data": {
+        "card": {
+            "card_number": "4242424242424242",
+            "exp_month": "12",
+            "exp_year": "2028"
+        }
+    },
+    "payment_method_options": {
+        "card": {
+            "mit_exemption": {
+                "network_transaction_id": "123456789012345"
+            }
+        }
+    }
+}
+```
+
+#### MIT Execution Flow
+
+```mermaid
+sequenceDiagram
+    participant M as Merchant System
+    participant H as Hyperswitch
+    participant R as Router
+    participant C1 as Connector A
+    participant C2 as Connector B
+
+    M->>H: POST /payments (off_session=true, recurring_details)
+    H->>R: Route MIT based on NTID availability
+    
+    alt NTID Available & Connector-Agnostic Enabled
+        R->>C1: Attempt MIT
+        C1-->>R: Success
+        R-->>H: Payment success
+    else Fallback to Original Connector
+        R->>C2: MIT with original PSP token
+        C2-->>R: Success
+        R-->>H: Payment success
+    end
+    
+    H-->>M: Payment confirmation
+    
+    Note over M,H: MIT processed without customer interaction
+```
+
+### PSP Configuration for Network Transaction ID
+
+{% hint style="warning" %}
+**PSP Configuration Required:** The NTID-based MIT feature requires explicit enablement by your PSP. If you encounter errors like `Received unknown parameter: payment_method_options[card][mit_exemption]`, contact your PSP support.
+
+**Request the following:**
+- Access to the `mit_exemption` parameter for MIT payments
+- Ability to pass `network_transaction_id` in payment requests
+- Explanation that your use case involves cross-processor MIT using scheme NTIDs
 {% endhint %}
 
-#### [**Network Transaction ID with Network Token**](https://api-reference.hyperswitch.io/v1/payments/payments--confirm#option-5) **:**&#x20;
+---
 
-Submit the network transaction identifier in combination with the corresponding network tokenized card credentials.
+## Connector-Agnostic MIT Routing
 
-#### [**Limited Card Data**](https://api-reference.hyperswitch.io/v1/payments/payments--confirm#option-6) **:**&#x20;
+Traditional recurring payment implementations create connector lock-in: the MIT must use the same processor that issued the token during the CIT. Hyperswitch solves this through connector-agnostic routing using Network Transaction IDs.
 
-Use a reduced card data set captured at the time of subscription creation to authorize subsequent MITs.
+### How It Works
 
-***
+When connector-agnostic MIT routing is enabled, Hyperswitch stores the NTID from the CIT as a chaining identifier. For subsequent MIT payments, the system can route to any supported connector that accepts NTID-based transactions—not just the original processor.
 
-### Connector-Agnostic MIT Routing
+```mermaid
+flowchart TB
+    subgraph CIT["CIT Phase"]
+        CUST[Customer Initiates] --> CIT1[CIT via Connector A]
+        CIT1 --> |Stores| NTID[Network Transaction ID]
+        CIT1 --> |Returns| PMID[payment_method_id]
+    end
+    
+    subgraph MIT["MIT Phase - Connector Agnostic"]
+        MIT1[MIT Request] --> ROUTER{Router Decision}
+        ROUTER --> |NTID Available| CA[Connector A]
+        ROUTER --> |NTID Available| CB[Connector B]
+        ROUTER --> |NTID Available| CC[Connector C]
+        ROUTER --> |Fallback| CIT1
+    end
+    
+    NTID --> ROUTER
+    PMID --> ROUTER
+    
+    style CIT fill:#e1f5fe
+    style MIT fill:#f3e5f5
+```
 
-The CIT used to set up recurring payments via MIT uses the PG token. This introduces a connector stickiness since the recurring payments can only go through the connector which issued the token.
+### Enabling Connector-Agnostic MITs
 
-To mitigate this we would be storing the Network Transaction ID which will be a chaining identifier for the CIT in which the payment method was saved for off-session payments.
-
-In the following MIT payments basis the enablement of the feature and the availability of Network Transaction ID Hyperswitch will route your payments to the eligible set of connectors. (This will also be used for retries)
-
-<figure><img src="../../../.gitbook/assets/image (97).png" alt=""><figcaption></figcaption></figure>
-
-#### Enabling Connector agnostic MITs
-
-To start routing MIT payments across all supported connectors in addition to the connector through which the recurring payment was set up, use the below API to enable it for a business profile
+Enable this feature for a business profile using the toggle API:
 
 ```bash
-curl --location 'http://sandbox.hyperswitch.io/account/:merchant_id/business_profile/:profile_id/toggle_connector_agnostic_mit' \
+curl --location 'https://sandbox.hyperswitch.io/account/:merchant_id/business_profile/:profile_id/toggle_connector_agnostic_mit' \
 --header 'Content-Type: application/json' \
 --header 'Accept: application/json' \
---header 'api-key: api_key' \
+--header 'api-key: YOUR_API_KEY' \
 --data '{
     "enabled": true
 }'
 ```
 
-All the payment methods saved with `setup_future_usage : off_session` after enabling this feature would now be eligible to be routed across the list of supported connectors during the subsequent MIT payments
+All payment methods saved with `setup_future_usage: "off_session"` after enabling this feature become eligible for routing across supported connectors during MIT processing.
 
-***
+---
 
-### Routing example - CITs are routed through PSP-1 and all MITs through PSP-2
+## Routing Configuration Example: Separate CIT and MIT Processors
 
-The [Hyperswitch dashboard](https://app.hyperswitch.io/dashboard/routing/rule) provides UI to configure routing rules for PG Agnostic Recurring Payments. You can choose the profile for which you wish to configure the rule in the Smart Routing Configuration.
+You can configure routing rules to direct CITs and MITs through different processors. This is useful when you want to optimise for different factors: CITs through a processor with strong 3DS support, and MITs through one with lower fees.
 
-Then, you can configure the rule as shown below using the metadata field in the Rule-Based Configuration.
+### Configure via Dashboard
 
-<figure><img src="../../../.gitbook/assets/Routing rule for pg agnostic recurring payments.png" alt=""><figcaption></figcaption></figure>
+1. Navigate to the [Hyperswitch Dashboard](https://app.hyperswitch.io/dashboard/routing/rule)
+2. Select your business profile
+3. Create rule-based routing using metadata fields
 
-This rule would be used in conjunction with the other active routing rules that you have configured.
+### Metadata for CIT Routing
 
-Once the rule is configured, you would need to send the following metadata as per the payment request:
-
-#### **Metadata to be sent in CITs**
-
-```
-"metadata": {
-    "is_cit": "true"
+```json
+{
+    "metadata": {
+        "is_cit": "true"
+    }
 }
 ```
 
-#### **Metadata to be sent in MITs**
+### Metadata for MIT Routing
 
-```
-"metadata": {
-    "is_mit": "true"
+```json
+{
+    "metadata": {
+        "is_mit": "true"
+    }
 }
 ```
 
-According to the above configured rule all the CITs for the specific business profile should be routed through Stripe and MITs through Adyen.
+### Example Routing Rule
+
+Configure the routing rule to match:
+- `is_cit: "true"` → Route through Stripe
+- `is_mit: "true"` → Route through Adyen
+
+This routing configuration works in conjunction with your other active routing rules, allowing sophisticated payment flow optimisation.
+
+---
+
+## Testing in Sandbox
+
+| Scenario | Test Approach | Expected Outcome |
+|----------|---------------|------------------|
+| CIT with charge | Create payment with amount > 0, `setup_future_usage: "off_session"` | Returns `payment_method_id` and `network_transaction_id` |
+| Zero dollar auth | Create payment with `amount: 0` | Returns `payment_method_id` without charging |
+| MIT with PM ID | Create payment with `off_session: true`, pass `payment_method_id` | Payment processed without customer interaction |
+| MIT routing | Enable connector-agnostic MIT, create MIT | Routes to eligible connector based on NTID |
+
+---
+
+## Troubleshooting
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Received unknown parameter: payment_method_options[card][mit_exemption]` | PSP hasn't enabled NTID-based MIT | Contact PSP support to enable `mit_exemption` parameter |
+| MIT declined with "authentication required" | CIT didn't properly store off-session consent | Verify `setup_future_usage: "off_session"` was set in CIT |
+| `payment_method_id` not found | Payment method wasn't saved during CIT | Ensure CIT completed successfully with customer authentication |
+| MIT routing to wrong connector | Connector-agnostic MIT not enabled | Call toggle API with `enabled: true` for your profile |
+
+---
+
+## Next Steps
+
+- [Tokenisation and Saved Cards](/explore-hyperswitch/payment-orchestration/quickstart/tokenization-and-saved-cards/zero-amount-authorization-1) - Deep dive on zero-dollar authorisation
+- [Routing Configuration](/hyperswitch-cloud/integration-guide/web/customization) - Set up advanced routing rules
+- [API Reference](https://api-reference.hyperswitch.io/v1/payments/payments--create) - Full API documentation
