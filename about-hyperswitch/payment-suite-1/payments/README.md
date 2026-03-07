@@ -93,7 +93,7 @@ Choose the right flow based on your business requirements:
 
 #### Sequence Diagram
 
-![Instant Payment Flow](../../../static/images/payment-flows/instant-payment-flow.png)
+<figure><img src="../../../.gitbook/assets/instant-payment-flow.png" alt="Instant Payment Flow"><figcaption>Sequence diagram for instant payment flow</figcaption></figure>
 
 **Key Characteristics:**
 - Single API call to create and confirm payment
@@ -111,7 +111,7 @@ Choose the right flow based on your business requirements:
 
 #### Sequence Diagram
 
-![Manual Capture Flow](../../../static/images/payment-flows/manual-capture-flow.png)
+<figure><img src="../../../.gitbook/assets/manual-capture-flow.png" alt="Manual Capture Flow"><figcaption>Sequence diagram for manual capture flow</figcaption></figure>
 
 **Key Characteristics:**
 - Authorization holds funds on customer's card
@@ -133,7 +133,7 @@ Learn more about [Manual Capture](manual-capture/) and [Overcapture](manual-capt
 
 #### Sequence Diagram
 
-![Decoupled Flow](../../../static/images/payment-flows/decoupled-flow.png)
+<figure><img src="../../../.gitbook/assets/decoupled-flow.png" alt="Decoupled Flow"><figcaption>Sequence diagram for decoupled flow</figcaption></figure>
 
 **Key Characteristics:**
 - Payment intent created separately from confirmation
@@ -151,7 +151,7 @@ Learn more about [Manual Capture](manual-capture/) and [Overcapture](manual-capt
 
 #### Sequence Diagram
 
-![3DS Authentication Flow](../../../static/images/payment-flows/3ds-auth-flow.png)
+<figure><img src="../../../.gitbook/assets/3ds-auth-flow.png" alt="3DS Authentication Flow"><figcaption>Sequence diagram for 3DS authentication flow</figcaption></figure>
 
 **Key Characteristics:**
 - Redirects customer to bank for authentication
@@ -235,7 +235,7 @@ Always consult with a PCI QSA for your specific compliance requirements.
 
 #### Sequence Diagram
 
-![Recurring Payment Flow](../../../static/images/payment-flows/recurring-payment-flow.png)
+<figure><img src="../../../.gitbook/assets/recurring-payment-flow.png" alt="Recurring Payment Flow"><figcaption>Sequence diagram for recurring payment flow</figcaption></figure>
 
 **Use Case:** First-time subscription signup with immediate charge or free trial setup.
 
@@ -245,7 +245,7 @@ Always consult with a PCI QSA for your specific compliance requirements.
 
 #### Sequence Diagram
 
-![MIT Execution Flow](../../../static/images/payment-flows/mit-execution-flow.png)
+<figure><img src="../../../.gitbook/assets/mit-execution-flow.png" alt="MIT Execution Flow"><figcaption>Sequence diagram for MIT execution flow</figcaption></figure>
 
 **MIT can use either:**
 - **Stored Payment Method** (`payment_method_id`): Reference the tokenized card
