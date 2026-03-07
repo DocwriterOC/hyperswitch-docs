@@ -2,130 +2,337 @@
 icon: file-invoice-dollar
 ---
 
-# Payments (cards)
+# Payments (Cards)
 
-Hyperswitch provides flexible payment processing with multiple flow patterns to accommodate different business needs. The system supports one-time payments, saved payment methods, and recurring billing through a comprehensive API design.
+Process card payments with flexibility and security. Hyperswitch supports multiple payment flows—from simple one-time charges to complex recurring billing—while keeping your PCI compliance scope minimal through secure tokenization.
 
-{% hint style="info" %}
-### Integration Path
-
-#### Client-Side SDK Payments (Tokenise Post Payment)
-
-Refer to Payments (Cards) section  if your flow requires the SDK to initiate payments directly. In this model, the SDK handles the payment trigger and communicates downstream to the Hyperswitch server and your chosen Payment Service Providers (PSPs). This path is ideal for supporting dynamic, frontend-driven payment experiences.
+{% hint style="success" %}
+**Why Hyperswitch for Card Payments?**
+- **Reduced PCI Scope**: Card data never touches your servers
+- **Multiple Capture Options**: Automatic, manual, partial, and scheduled captures
+- **3D Secure Ready**: Built-in support for customer authentication
+- **Smart Routing**: Automatic failover between payment processors
 {% endhint %}
 
-<figure><img src="../../../.gitbook/assets/image (33).png" alt=""><figcaption></figcaption></figure>
+## Table of Contents
 
-### One-Time Payment Patterns
+- [Core Concepts](#core-concepts)
+- [Payment Flows](#payment-flows)
+  - [Instant Payment (Automatic Capture)](#1-instant-payment-automatic-capture)
+  - [Two-Step Manual Capture](#2-two-step-manual-capture)
+  - [Fully Decoupled Flow](#3-fully-decoupled-flow)
+  - [3D Secure Authentication](#4-3d-secure-authentication-flow)
+- [Recurring Payments](#recurring-payments-and-payment-storage)
+- [Saved Payment Methods](#using-saved-payment-methods)
+- [Status Flow Summary](#status-flow-summary)
+- [When to Use Which Flow](#when-to-use-which-flow)
+- [Related Documentation](#related-documentation)
 
-#### 1. Instant Payment (Automatic Capture)
+---
 
-**Use Case:** Simple, immediate payment processing
+## Core Concepts
 
-**Endpoint:** `POST /payments`
+### Terminology
 
-<figure><img src="../../../.gitbook/assets/image (39).png" alt=""><figcaption></figcaption></figure>
+| Term | Description | Example |
+|------|-------------|---------|
+| `payment_method` | Type of payment instrument | `card`, `wallet`, `bank_transfer` |
+| `payment_method_type` | Specific variant | `credit`, `debit` |
+| `payment_method_id` | Token representing stored payment method | `pm_abc123xyz` |
+| `payment_token` | Short-lived token for confirming payment | `token_xyz789` |
+| `client_secret` | Secret key for client-side operations | `pay_xxxxx_secret` |
+| `setup_future_usage` | Intent for storing payment method | `on_session`, `off_session` |
+| `CIT` | Customer-Initiated Transaction | Customer actively present |
+| `MIT` | Merchant-Initiated Transaction | Background/recurring charge |
 
-**Required Fields:**
+### Capture Methods
 
-* `confirm: true`
-* `capture_method: "automatic"`
-* `payment_method`
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| `automatic` | Funds captured immediately | Simple e-commerce |
+| `manual` | Authorization only, capture later | Ship before charging |
+| `manual_multiple` | Multiple partial captures | Installment releases |
+| `scheduled` | Auto-capture at future time | Pre-ordered items |
 
-**Final Status:** `succeeded`
+### Payment Status Flow
 
-#### 2. Two-Step Manual Capture
+```
+created → requires_confirmation → processing → succeeded
+                     ↓
+              requires_customer_action (3DS)
+                     ↓
+              requires_capture (manual capture)
+                     ↓
+              failed / cancelled / partially_captured
+```
 
-**Use Case:** Deferred capture (e.g., ship before charging)
+**Terminal States** (no further action required):
+- `succeeded` - Payment completed successfully
+- `failed` - Payment failed, can retry with different method
+- `cancelled` - Payment was cancelled
+- `partially_captured` - Partial capture completed (manual_multiple)
 
-<figure><img src="../../../.gitbook/assets/image (42).png" alt=""><figcaption></figcaption></figure>
+---
 
-**Flow:**
+## Payment Flows
 
-1. **Authorize:** `POST /payments` with `capture_method: "manual"`
-2. **Status:** `requires_capture`
-3. **Capture:** `POST /payments/{payment_id}/capture`
-4. **Final Status:** `succeeded`
+Choose the right flow based on your business requirements:
 
-Read more - [here](https://docs.hyperswitch.io/~/revisions/2M8ySHqN3pH3rctBK2zj/about-hyperswitch/payment-suite-1/payments-cards/manual-capture)
+| Flow | Capture | Customer Present | Complexity | Best For |
+|------|---------|------------------|------------|----------|
+| **Instant** | Automatic | Yes | Low | Standard checkout |
+| **Manual** | Manual | Yes | Medium | Delayed shipping |
+| **Decoupled** | Either | Yes | High | Progressive checkout |
+| **3D Secure** | Either | Yes | Medium | High-risk transactions |
 
-#### 3. Fully Decoupled Flow
+### 1. Instant Payment (Automatic Capture)
 
-**Use Case:** Complex checkout journeys with multiple modification steps. Useful in headless checkout or B2B portals where data is filled progressively.
+**Use Case:** Standard e-commerce checkout where goods are shipped immediately or services delivered instantly.
 
-<figure><img src="../../../.gitbook/assets/image (43).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/image (39).png" alt="Instant Payment Flow"><figcaption>Instant payment with automatic capture</figcaption></figure>
 
-**Endpoints:**
+#### Sequence Diagram
 
-* **Create:** `POST /payments`
-* **Update:** `POST /payments/{payment_id}`
-* **Confirm:** `POST /payments/{payment_id}/confirm`
-* **Capture:** `POST /payments/{payment_id}/capture` (if manual)
+<figure><img src="../../../.gitbook/assets/instant-payment-flow.png" alt="Instant Payment Flow"><figcaption>Sequence diagram for instant payment flow</figcaption></figure>
 
-#### 4. 3D Secure Authentication Flow
+**Key Characteristics:**
+- Single API call to create and confirm payment
+- Funds captured immediately upon authorization
+- Best for digital goods, immediate service delivery
+- No additional capture step required
 
-**Use Case:** Enhanced security with customer authentication
+---
 
-<figure><img src="../../../.gitbook/assets/image (44).png" alt=""><figcaption></figcaption></figure>
+### 2. Two-Step Manual Capture
 
-**Additional Fields:**
+**Use Case:** When you need to authorize funds but capture only after shipping, service completion, or inventory confirmation.
 
-* `authentication_type: "three_ds"`
+<figure><img src="../../../.gitbook/assets/image (42).png" alt="Manual Capture Flow"><figcaption>Authorize now, capture later</figcaption></figure>
 
-**Status Progression:** `processing` → `requires_customer_action` → `succeeded`
+#### Sequence Diagram
 
-Read more - [link](https://docs.hyperswitch.io/~/revisions/9QlGypixZFcbkq8oGjaF/explore-hyperswitch/workflows/3ds-decision-manager) &#x20;
+<figure><img src="../../../.gitbook/assets/manual-capture-flow.png" alt="Manual Capture Flow"><figcaption>Sequence diagram for manual capture flow</figcaption></figure>
 
-### Recurring payments and Payment storage
+**Key Characteristics:**
+- Authorization holds funds on customer's card
+- Capture can be full or partial amount
+- Multiple partial captures supported with `manual_multiple`
+- Authorization typically expires after 7-10 days
 
-#### 1. Saving Payment Methods
+{% hint style="info" %}
+Learn more about [Manual Capture](manual-capture/) and [Overcapture](manual-capture/overcapture.md) for capturing amounts greater than the original authorization.
+{% endhint %}
 
-**During Payment Creation:**
+---
 
-* Add `setup_future_usage: "off_session"` or `"on_session"`
-* Include `customer_id`
-* **Result:** `payment_method_id` returned on success
+### 3. Fully Decoupled Flow
 
-**Understanding `setup_future_usage`:**
+**Use Case:** Complex checkout journeys where payment data is collected progressively, such as headless checkout, B2B portals, or multi-step forms.
 
-* **`on_session`**: Use when the customer is actively present during the transaction. This is typical for scenarios like saving card details for faster checkouts in subsequent sessions where the customer will still be present to initiate the payment (e.g., card vaulting for e-commerce sites).
-* **`off_session`**: Use when you intend to charge the customer later without their active involvement at the time of charge. This is suitable for subscriptions, recurring billing, or merchant-initiated transactions (MITs) where the customer has pre-authorized future charges.
+<figure><img src="../../../.gitbook/assets/image (43).png" alt="Decoupled Flow"><figcaption>Create → Update → Confirm → Capture</figcaption></figure>
 
-#### 2. Using Saved Payment Methods
+#### Sequence Diagram
 
-<figure><img src="../../../.gitbook/assets/image (45).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/decoupled-flow.png" alt="Decoupled Flow"><figcaption>Sequence diagram for decoupled flow</figcaption></figure>
 
-**Steps:**
+**Key Characteristics:**
+- Payment intent created separately from confirmation
+- Allows incremental data collection
+- Supports both automatic and manual capture
+- Ideal for multi-page checkout flows
 
-1. **Initiate:** Create payment with `customer_id`
-2. **List:** Get saved cards via `GET /customers/payment_methods`
-3. **Confirm:** Use selected `payment_token` in confirm call
+---
 
-#### PCI Compliance and `payment_method_id`
+### 4. 3D Secure Authentication Flow
 
-Storing `payment_method_id` (which is a token representing the actual payment instrument, which could be a payment token, network token, or payment processor token) significantly reduces your PCI DSS scope. Hyperswitch securely stores the sensitive card details and provides you with this token. While you still need to ensure your systems handle `payment_method_id` and related customer data securely, you avoid the complexities of storing raw card numbers. Always consult with a PCI QSA to understand your specific compliance obligations.
+**Use Case:** Enhanced security for high-risk transactions or regulatory compliance (PSD2 SCA).
 
-### Recurring Payment Flows
+<figure><img src="../../../.gitbook/assets/image (44).png" alt="3DS Flow"><figcaption>3D Secure customer authentication</figcaption></figure>
 
-#### 3. Customer-Initiated Transaction (CIT) Setup
+#### Sequence Diagram
 
-<figure><img src="../../../.gitbook/assets/image (48).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/3ds-auth-flow.png" alt="3DS Authentication Flow"><figcaption>Sequence diagram for 3DS authentication flow</figcaption></figure>
 
-Read more - [link](https://docs.hyperswitch.io/~/revisions/j00Urtz9MpwPggJzRCsi/about-hyperswitch/payment-suite-1/payments-cards/recurring-payments)
+**Key Characteristics:**
+- Redirects customer to bank for authentication
+- Required for high-risk transactions
+- Supports both frictionless and challenge flows
+- Mandatory for PSD2 compliance in EU
 
-#### 4. Merchant-Initiated Transaction (MIT) Execution
+**Status Progression:**
+```
+processing → requires_customer_action → succeeded
+                    ↓
+              (Customer completes 3DS)
+                    ↓
+              redirect to return_url
+```
 
-<figure><img src="../../../.gitbook/assets/image (50).png" alt=""><figcaption></figcaption></figure>
+{% hint style="info" %}
+Learn more about [3DS Decision Manager](../../explore-hyperswitch/workflows/3ds-decision-manager.md) for configuring authentication rules.
+{% endhint %}
 
-Read more - [link](https://docs.hyperswitch.io/~/revisions/j00Urtz9MpwPggJzRCsi/about-hyperswitch/payment-suite-1/payments-cards/recurring-payments)
+---
 
-### Status Flow Summary
+## Recurring Payments and Payment Storage
 
-<figure><img src="../../../.gitbook/assets/image (81).png" alt=""><figcaption></figcaption></figure>
+Store payment methods for future use with customer consent.
 
-### Notes
+### Saving Payment Methods
 
-* **Terminal States:** `succeeded`, `failed`, `cancelled`, `partially_captured` are terminal states requiring no further action
-* **Capture Methods:** System supports `automatic` (funds captured immediately), `manual` (funds captured in a separate step), `manual_multiple` (funds captured in multiple partial amounts via separate steps), and `scheduled` (funds captured automatically at a future predefined time) capture methods.
-* **Authentication:** 3DS authentication automatically resumes payment processing after customer completion
-* **MIT Compliance:** Off-session recurring payments follow industry standards for merchant-initiated transactions
+When creating a payment, set `setup_future_usage` to indicate intent for storing the payment method:
+
+| Value | Use When | Example |
+|-------|----------|---------|
+| `on_session` | Customer will be present for future payments | Express checkout for returning customers |
+| `off_session` | Charging without customer present | Subscriptions, auto-renewals |
+
+### Customer Consent Capture
+
+For compliance with card network rules, you must capture explicit customer consent before storing payment methods. The `customer_acceptance` object records:
+
+- **Acceptance type**: How consent was obtained (online/offline)
+- **Timestamp**: When consent was given
+- **Online context**: IP address and user agent (for online consent)
+
+{% hint style="info" %}
+When using Hyperswitch SDK, `customer_acceptance` is automatically sent when the customer checks "Save card for future use".
+{% endhint %}
+
+---
+
+## Using Saved Payment Methods
+
+<figure><img src="../../../.gitbook/assets/image (45).png" alt="Saved Payment Methods"><figcaption>Retrieve and use stored payment methods</figcaption></figure>
+
+### Retrieving Stored Payment Methods
+
+Use the customer's stored payment methods endpoint to display saved cards. The response includes masked card details (last 4 digits, expiry) without exposing sensitive data.
+
+### Using a Saved Payment Method
+
+Reference the stored payment method using `payment_token` (the `payment_method_id`) in subsequent payment requests. This eliminates the need to collect card details again.
+
+### PCI Compliance and Tokenization
+
+Storing `payment_method_id` (a secure token) instead of raw card data significantly reduces your PCI DSS scope:
+
+| Approach | PCI Scope | Description |
+|----------|-----------|-------------|
+| Hyperswitch SDK | SAQ A | Minimal compliance - no card data touches your systems |
+| Direct API Integration | SAQ D | Full compliance required - card data passes through your servers |
+| Token Only (`payment_method_id`) | SAQ A-EP | Reduced scope - only tokens stored |
+
+Always consult with a PCI QSA for your specific compliance requirements.
+
+---
+
+## Recurring Payment Flows
+
+### Customer-Initiated Transaction (CIT) Setup
+
+<figure><img src="../../../.gitbook/assets/image (48).png" alt="CIT Flow"><figcaption>Customer-initiated transaction with card storage</figcaption></figure>
+
+#### Sequence Diagram
+
+<figure><img src="../../../.gitbook/assets/recurring-payment-flow.png" alt="Recurring Payment Flow"><figcaption>Sequence diagram for recurring payment flow</figcaption></figure>
+
+**Use Case:** First-time subscription signup with immediate charge or free trial setup.
+
+### Merchant-Initiated Transaction (MIT) Execution
+
+<figure><img src="../../../.gitbook/assets/image (50).png" alt="MIT Flow"><figcaption>Merchant-initiated recurring charge</figcaption></figure>
+
+#### Sequence Diagram
+
+<figure><img src="../../../.gitbook/assets/mit-execution-flow.png" alt="MIT Execution Flow"><figcaption>Sequence diagram for MIT execution flow</figcaption></figure>
+
+**MIT can use either:**
+- **Stored Payment Method** (`payment_method_id`): Reference the tokenized card
+- **Network Transaction ID**: Use the network transaction ID from a previous CIT
+
+{% hint style="info" %}
+Learn more about [Recurring Payments](recurring-payments.md), including connector-agnostic MIT routing.
+{% endhint %}
+
+---
+
+## When to Use Which Flow
+
+Use this decision matrix to select the appropriate payment flow for your use case:
+
+| Use Case | Recommended Flow | Capture Method | Key Parameters |
+|----------|-----------------|----------------|----------------|
+| Standard e-commerce checkout | Instant Payment | `automatic` | `confirm: true` |
+| Pre-orders / Backorders | Two-Step Manual | `manual` | `confirm: true`, capture later |
+| Multi-step checkout wizard | Decoupled Flow | Either | `confirm: false` initially |
+| High-value transactions (>€30) | 3D Secure | Either | `authentication_type: three_ds` |
+| Subscription signup | CIT Flow | `automatic` | `setup_future_usage: off_session` |
+| Recurring billing | MIT Flow | `automatic` | `off_session: true` |
+| Pay-per-use services | Manual Capture | `manual` | Charge after usage period |
+| Marketplace with holds | Manual Multiple | `manual_multiple` | Partial captures to seller |
+
+### Flow Selection Decision Tree
+
+```
+Is this a recurring/subscription payment?
+├── YES → Has customer completed initial CIT?
+│   ├── YES → Use MIT Flow (off_session: true)
+│   └── NO → Use CIT Flow (setup_future_usage: off_session)
+└── NO → Is customer present during checkout?
+    ├── NO → Error: Card payments require customer presence
+    └── YES → Do you need to authorize before capturing?
+        ├── YES → Use Two-Step Manual Capture
+        └── NO → Is this a multi-step checkout?
+            ├── YES → Use Decoupled Flow
+            └── NO → Does transaction require 3DS?
+                ├── YES → Use 3D Secure Flow
+                └── NO → Use Instant Payment
+```
+
+---
+
+## Status Flow Summary
+
+<figure><img src="../../../.gitbook/assets/image (81).png" alt="Status Flow"><figcaption>Complete payment status lifecycle</figcaption></figure>
+
+### Status Quick Reference
+
+| Status | Action Required | Terminal |
+|--------|-----------------|----------|
+| `requires_confirmation` | Confirm payment | No |
+| `requires_customer_action` | Complete 3DS/redirect | No |
+| `requires_capture` | Capture funds | No |
+| `processing` | Wait for completion | No |
+| `succeeded` | None | Yes |
+| `failed` | Retry or alternate method | Yes |
+| `cancelled` | None | Yes |
+| `partially_captured` | Capture remaining (optional) | Yes |
+
+---
+
+## Related Documentation
+
+### Getting Started
+- [Quick Start Guide](../../getting-started/quick-start/) - Set up your first payment in 5 minutes
+- [API Keys Setup](../../getting-started/api-keys.md) - Generate and manage API credentials
+- [Business Profiles](../../getting-started/business-profiles.md) - Configure payment processors
+
+### Payment Flows
+- [Manual Capture](manual-capture/) - Deep dive into manual and partial capture
+- [Recurring Payments](recurring-payments.md) - Complete guide to CIT/MIT flows
+- [3DS Decision Manager](../../explore-hyperswitch/workflows/3ds-decision-manager.md) - Configure authentication rules
+
+### Integration
+- [Hyperswitch SDK](../../getting-started/hyperswitch-sdk.md) - Client-side integration guide
+- [Webhooks](../../webhooks/) - Real-time payment status updates
+- [Testing in Sandbox](../../getting-started/testing.md) - Test card numbers and scenarios
+
+### Reference
+- [API Reference](https://api-reference.hyperswitch.io) - Complete API documentation
+- [Error Codes](../../reference/error-codes.md) - Troubleshooting common issues
+- [PCI Compliance Guide](../../security/pci-compliance.md) - Compliance requirements
+
+### Support
+- [Discord Community](https://discord.gg/hyperswitch) - Get help from the community
+- [Support Email](mailto:support@hyperswitch.io) - Contact our support team
