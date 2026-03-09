@@ -216,3 +216,15 @@ Once the rule is configured, you would need to send the following metadata as pe
 ```
 
 According to the above configured rule all the CITs for the specific business profile should be routed through Stripe and MITs through Adyen.
+
+***
+
+## Related Documentation
+
+- [Payments Overview](../payments/README.md)
+- [Cards Payment Method](../payments-cards/README.md)
+- [Smart Routing](../../../features/smart-router.md)
+
+## Support
+
+For questions or issues, refer to our [FAQs](../../../faqs/) or contact support.
