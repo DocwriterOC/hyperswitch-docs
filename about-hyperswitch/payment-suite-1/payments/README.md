@@ -118,6 +118,7 @@ Choose the right flow based on your business requirements:
 - Capture can be full or partial amount
 - Multiple partial captures supported with `manual_multiple`
 - Authorization typically expires after 7-10 days
+- Reauthorization available if capture is delayed beyond expiration period
 
 {% hint style="info" %}
 Learn more about [Manual Capture](manual-capture/) and [Overcapture](manual-capture/overcapture.md) for capturing amounts greater than the original authorization.
