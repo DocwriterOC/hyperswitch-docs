@@ -22,7 +22,7 @@ You decide who owns each component: Hyperswitch manages it, you self-host it, or
 | Component | Role | Ownership Options |
 |-----------|------|-------------------|
 | **SDK (Frontend)** | Entry point for your payment flow; securely captures sensitive payment information | Hyperswitch-hosted or self-hosted |
-| **Intelligent Routing & Orchestration (Backend)** | Manages payment lifecycle, executes routing logic, handles post-payment operations like refunds | Hyperswitch Cloud or self-hosted |
+| **Intelligent Routing & Orchestration (Backend)** | Manages payment lifecycle, executes routing logic, executes routing logic, handles payment lifecycle | Hyperswitch Cloud or self-hosted |
 | **Acquirer & Processor Connectivity (Connectors)** | Pipeline that translates transactions to payment processors (e.g., Stripe, Adyen, Worldpay) | Hyperswitch-managed connectors |
 | **Vault (Card Data Storage)** | Secure storage for card data enabling one-click and recurring payments | Hyperswitch Vault, external vault, or self-hosted |
 
