@@ -1,21 +1,11 @@
 ---
-description: >-
-  Integrate with more than 200+ Connectors enabling 150+ payment methods with
-  zero development effort.
-icon: plug
+description: Connectors form the foundation of Hyperswitch's payment orchestration layer, enabling seamless integration with various payment processors and service providers.
+icon: network-wired
 ---
 
-# Connectors Integration
+# Connectors
 
-### Overview
-
-Connectors are integrations that allow Hyperswitch to talk to external payment services such as PSPs, Acquirers, [APMs](https://docs.hyperswitch.io/explore-hyperswitch/payment-experience/payment/enable-alternate-payment-method-widgets), [Card vaults](https://docs.hyperswitch.io/explore-hyperswitch/workflows/vault), [3DS authentications](https://docs.hyperswitch.io/explore-hyperswitch/workflows/3ds-decision-manager), [Fraud management](https://docs.hyperswitch.io/explore-hyperswitch/workflows/fraud-and-risk-management), [Subscription](https://docs.hyperswitch.io/explore-hyperswitch/payment-orchestration/subscriptions), Payouts and more. They act as bridges between your Hyperswitch setup and the third-party services that move or manage money for your business.
-
-Every provider has its own APIs, authentication methods, and feature sets. Hyperswitch standardizes these differences through connectors, exposing a single unified Payments API. This means you can add, switch, or remove processors without rewriting your code—just plug in credentials and start transacting.
-
-Connectors form the foundation of Hyperswitch's payment orchestration layer, enabling you to manage payments, routing, 3DS authentication, fraud checks, and payouts through a single interface.
-
-#### Why Multiple Processors?
+Connectors form the foundation of Hyperswitch's payment orchestration layer, enabling businesses to integrate with multiple payment processors (PSPs), fraud and risk management providers, tax processors and identity verification services.
 
 As your business grows faster, there would be a need to expand payment offerings with more payment processors. This need might arise due to multiple reasons:
 
@@ -77,8 +67,8 @@ Add the PSP authentication credentials from their dashboard into the Hyperswitch
 
 Authentication credentials vary across different PSPs. Common combinations include:
 
-| Provider | Required Credentials | Credential Location |
-|----------|---------------------|---------------------|
+| Provider | Required Credentials | Where to Find |
+|----------|---------------------|---------------|
 | **Authorize.net** | API Login ID and Transaction Key | Account → API Login ID & Transaction Key |
 | **Adyen** | API key and Account ID | Developer → API credentials |
 | **Braintree** | Merchant ID, Public key and Private key | Account → API Keys |
@@ -100,7 +90,7 @@ Choose the payment methods you want to utilize with the connector by navigating 
 - Set fallback priority (if using multiple connectors)
 - Configure webhook endpoints (optional but recommended)
 
-#### Step 5: Activation
+#### Step 5: Activation & Testing
 
 Enable the PSP once you're done with configuration.
 
@@ -108,108 +98,23 @@ Enable the PSP once you're done with configuration.
 - [ ] Credentials verified (green checkmarks)
 - [ ] Payment methods selected
 - [ ] Webhooks configured (optional)
-- [ ] Sandbox test transactions completed
 
----
+**After Activation:**
+- [ ] Complete sandbox test transactions
+- [ ] Verify payment status updates
+- [ ] Test refund flow
 
-## API Configuration (Programmatic)
-
-Connectors can also be configured via API for automation or bulk setup:
-
-### Create Connector via API
-
-**Endpoint:** `POST /v1/account/connector_accounts`
-
-**Request:**
-
-```bash
-curl -X POST https://api.hyperswitch.io/v1/account/connector_accounts \
-  -H "Content-Type: application/json" \
-  -H "api-key: your_api_key" \
-  -d '{
-    "connector_type": "payment_processor",
-    "connector_name": "stripe",
-    "connector_account_details": {
-      "auth_type": "HeaderKey",
-      "api_key": "sk_test_your_key"
-    },
-    "test_mode": true,
-    "disabled": false,
-    "payment_methods_enabled": [
-      {
-        "payment_method": "card",
-        "payment_method_types": [
-          {"payment_method_type": "credit", "card_networks": ["Visa", "Mastercard"]},
-          {"payment_method_type": "debit", "card_networks": ["Visa"]}
-        ]
-      }
-    ]
-  }'
-```
-
-**Response:**
-
-```json
-{
-  "connector_id": "conn_abc123xyz",
-  "connector_name": "stripe",
-  "connector_type": "payment_processor",
-  "status": "active",
-  "test_mode": true
-}
-```
-
-### List All Connectors
-
-```bash
-curl https://api.hyperswitch.io/v1/account/connector_accounts \
-  -H "api-key: your_api_key"
-```
-
----
-
-## Webhook Configuration
-
-Webhooks notify your system about connector events in real-time.
-
-### Why Configure Webhooks?
-
-- Receive payment status updates instantly
-- Handle asynchronous payment confirmations
-- Process refunds and chargebacks automatically
-- Sync transaction data with your database
-
-### Setup Steps
-
-1. **Configure Endpoint:** In Control Center → Connectors → [Your Connector] → Webhooks
-2. **Set URL:** `https://your-domain.com/webhooks/hyperswitch`
-3. **Select Events:**
-   - `payment_intent.succeeded`
-   - `payment_intent.failed`
-   - `refund.succeeded`
-   - `dispute.created`
-4. **Verify Signature:** Use webhook secret to validate payloads
-
-**Webhook Payload Example:**
-
-```json
-{
-  "event": "payment_intent.succeeded",
-  "data": {
-    "payment_id": "pay_xyz789",
-    "status": "succeeded",
-    "connector": "stripe",
-    "amount": 1000,
-    "currency": "USD"
-  }
-}
-```
+{% hint style="info" %}
+**Note:** Testing is performed after activating the connector in Sandbox mode. The connector must be active to process test transactions.
+{% endhint %}
 
 ---
 
 ## Testing Your Connector
 
 ### Sandbox Testing Checklist
+
+Once your connector is active in Sandbox mode:
 
 - [ ] Create test payment (use test card numbers)
 - [ ] Verify payment status updates
@@ -253,40 +158,6 @@ In Control Center → Connectors, look for:
 | Connection Timeout | Network issue | Check PSP status page, retry |
 | Method Not Supported | PSP doesn't support method | Disable method in connector config |
 | Rate Limited | Too many requests | Implement exponential backoff |
-
-### Connector Status API
-
-```bash
-curl https://api.hyperswitch.io/v1/account/connector_accounts/conn_abc123xyz/status \
-  -H "api-key: your_api_key"
-```
-
----
-
-## Error Handling
-
-### Common Error Codes
-
-| Error Code | HTTP Status | Description | Resolution |
-|------------|-------------|-------------|------------|
-| `connector_authentication_failed` | 401 | Invalid credentials | Re-enter PSP credentials |
-| `connector_timeout` | 504 | Gateway timeout | Retry with idempotency key |
-| `connector_unavailable` | 503 | PSP down | Enable fallback connector |
-| `payment_method_not_supported` | 400 | Method not enabled | Enable method in connector config |
-| `rate_limit_exceeded` | 429 | Too many requests | Implement rate limiting |
-| `invalid_connector_configuration` | 400 | Misconfigured | Review connector settings |
-
-### Idempotency for Retries
-
-Use `Idempotency-Key` header for safe retries:
-
-```bash
-curl -X POST https://api.hyperswitch.io/v1/payments \
-  -H "Content-Type: application/json" \
-  -H "api-key: your_api_key" \
-  -H "Idempotency-Key: unique-key-$(date +%s)" \
-  -d '{...}'
-```
 
 ---
 
@@ -339,6 +210,9 @@ A: Yes, toggle the "Disabled" switch in connector settings. No transactions will
 
 **Q: How do I know which payment methods a connector supports?**
 A: Check our [Integrations Directory](https://juspay.io/integrations) for supported methods per connector.
+
+**Q: Can I test payments before activating a connector?**
+A: No, the connector must be active (in Sandbox mode) to process test transactions. Activate first, then test.
 
 ---
 
