@@ -67,7 +67,9 @@ Add the PSP authentication credentials from their dashboard into the Hyperswitch
 
 Authentication credentials vary across different PSPs. Common combinations include:
 
-| Provider | Required Credentials | Where to Find |
+You will need to locate these credentials within your PSP's developer portal or dashboard, then copy them into Hyperswitch Control Center.
+
+| Provider | Required Credentials | Where to Find in PSP Dashboard |
 |----------|---------------------|---------------|
 | **Authorize.net** | API Login ID and Transaction Key | Account → API Login ID & Transaction Key |
 | **Adyen** | API key and Account ID | Developer → API credentials |
@@ -94,15 +96,13 @@ Choose the payment methods you want to utilize with the connector by navigating 
 
 Enable the PSP once you're done with configuration.
 
-**Before Activating:**
-- [ ] Credentials verified (green checkmarks)
-- [ ] Payment methods selected
-- [ ] Webhooks configured (optional)
-
-**After Activation:**
+**Testing Checklist:**
+- [ ] Credentials verified (green checkmarks in Control Center)
+- [ ] Payment methods selected and enabled
+- [ ] Sandbox mode enabled
 - [ ] Complete sandbox test transactions
-- [ ] Verify payment status updates
-- [ ] Test refund flow
+- [ ] Verify test payment processed successfully
+- [ ] Test refund flow (if applicable)
 
 {% hint style="info" %}
 **Note:** Testing is performed after activating the connector in Sandbox mode. The connector must be active to process test transactions.
