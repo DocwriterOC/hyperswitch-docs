@@ -25,7 +25,7 @@ As your business grows faster, there would be a need to expand payment offerings
 * **Localized Experience:** Offering local or new payment methods for your customers.
 * **Reliability:** Reducing technical downtimes and improving success rates with a fallback.
 
-Integrating and maintaining multiple payment processors and their different versions is a time and resource intensive process. Hyperswitch can add a new PSP in approximately 2 weeks, allowing you to focus on your core business activities.
+Integrating and maintaining multiple payment processors and their different versions is a time and resource intensive process. Hyperswitch can add a new PSP in [2 weeks](https://hyperswitch.io/blog/part-1-5-payment-challenges-for-vertical-saas-businesses), allowing you to focus on your core business activities.
 
 ---
 
