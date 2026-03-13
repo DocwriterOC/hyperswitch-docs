@@ -67,7 +67,7 @@ Add the PSP authentication credentials from their dashboard into the Hyperswitch
 
 Authentication credentials vary across different PSPs. Common combinations include:
 
-You will need to locate these credentials within your PSP's developer portal or dashboard, then copy them into Hyperswitch Control Center.
+The table below shows where to locate each required credential within your PSP's developer portal or dashboard:
 
 | Provider | Required Credentials | Where to Find in PSP Dashboard |
 |----------|---------------------|---------------|
@@ -96,13 +96,17 @@ Choose the payment methods you want to utilize with the connector by navigating 
 
 Enable the PSP once you're done with configuration.
 
-**Testing Checklist:**
-- [ ] Credentials verified (green checkmarks in Control Center)
-- [ ] Payment methods selected and enabled
+**Before Activating:**
+- [ ] Credentials verified
+- [ ] Payment methods selected
+- [ ] Webhooks configured (optional)
+
+**After Activation:**
+- [ ] Activate connector
 - [ ] Sandbox mode enabled
 - [ ] Complete sandbox test transactions
-- [ ] Verify test payment processed successfully
-- [ ] Test refund flow (if applicable)
+- [ ] Verify test payment
+- [ ] Test refund flow
 
 {% hint style="info" %}
 **Note:** Testing is performed after activating the connector in Sandbox mode. The connector must be active to process test transactions.
