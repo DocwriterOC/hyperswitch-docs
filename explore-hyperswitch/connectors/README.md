@@ -31,13 +31,7 @@ Integrating and maintaining multiple payment processors and their different vers
 
 ## Prerequisites
 
-Before adding a connector, ensure you have:
-
-- [ ] **Hyperswitch Account:** Registered on [Hyperswitch Control Center](https://app.hyperswitch.io/)
-- [ ] **API Keys:** Access to your Hyperswitch API keys (Settings → API Keys)
-- [ ] **PSP Account:** Active account with your chosen payment processor
-- [ ] **PSP Credentials:** Required authentication details from your PSP dashboard
-- [ ] **Environment Decision:** Whether to configure in Sandbox or Production
+Before adding a connector, ensure you have completed all [prerequisites](./prerequisites.md) including Hyperswitch account setup, PSP account registration, and credential access.
 
 {% hint style="warning" %}
 **Important:** Always test connectors in Sandbox mode before activating in Production.
