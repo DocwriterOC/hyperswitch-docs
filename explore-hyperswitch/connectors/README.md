@@ -87,7 +87,7 @@ Authentication credentials vary across different PSPs. Common combinations inclu
 | **PayPal** | Client Secret and Client ID | Developer Dashboard → App Credentials |
 
 {% hint style="info" %}
-**Tip:** Not sure where to find your credentials? Check our [full connector credentials reference](https://docs.hyperswitch.io/explore-hyperswitch/connectors/credentials-reference) for 50+ providers.
+**Tip:** Not sure where to find your credentials? Check our [Integrations Directory](https://juspay.io/integrations) for the full list of supported providers.
 {% endhint %}
 
 #### Step 4: Method Configuration
