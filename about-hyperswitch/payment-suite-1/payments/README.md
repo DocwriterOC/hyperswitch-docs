@@ -24,7 +24,7 @@ Hyperswitch Payments API enables you to process payments with flexibility and co
 ### Choose Your Integration Path
 
 **Option 1: Client-Side SDK (Recommended for Most)**
-Use [Unified Checkout](https://docs.hyperswitch.io/explore-hyperswitch/merchant-controls/integration-guide) if you don't hold PCI certification. The SDK handles payment data collection securely without card data touching your servers.
+Use [Unified Checkout](https://docs.hyperswitch.io/explore-hyperswitch/payment-experience/payment/web) if you don't hold PCI certification. The SDK handles payment data collection securely without card data touching your servers.
 
 **Option 2: Server-Side API (This Guide)**
 Use this API guide if you:
