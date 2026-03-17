@@ -23,6 +23,11 @@ The sections below outline the architectural patterns required to scale a multi-
 
 Juspay hyperswitch provides a built-in hierarchy designed specifically for multi-tenant platforms. Understanding this model is essential before implementing your integration.
 
+![Platform Hierarchy Diagram](../.gitbook/assets/platform-hierarchy-diagram.png)
+
+<details>
+<summary>View Mermaid source (for maintainability)</summary>
+
 ```mermaid
 flowchart TB
     subgraph Org["Organisation"]
@@ -58,7 +63,8 @@ flowchart TB
     style Prof1B fill:#e8f5e9,stroke:#2e7d32
     style Prof2A fill:#e8f5e9,stroke:#2e7d32
 ```
-<!-- NOTE: Product Designer should render this diagram to PNG format per Workflow1.md diagram integration rules -->
+
+</details>
 
 **Hierarchy Levels:**
 
