@@ -58,6 +58,7 @@ flowchart TB
     style Prof1B fill:#e8f5e9,stroke:#2e7d32
     style Prof2A fill:#e8f5e9,stroke:#2e7d32
 ```
+<!-- NOTE: Product Designer should render this diagram to PNG format per Workflow1.md diagram integration rules -->
 
 **Hierarchy Levels:**
 
@@ -141,7 +142,7 @@ Follow these steps to programmatically onboard a new merchant account:
 
 curl --request POST \
   --url https://sandbox.hyperswitch.io/merchant_accounts \
-  --header 'api-key: YOUR_ADMIN_API_KEY' \
+  --header 'api-key: YOUR_API_KEY' \
   --header 'content-type: application/json' \
   --header 'x-idempotency-key: idempotency_key_123' \
   --data '{
@@ -217,7 +218,7 @@ After creating the merchant account, complete these steps before processing paym
     ```bash
     curl --request POST \
       --url https://sandbox.hyperswitch.io/webhook_endpoints \
-      --header 'api-key: YOUR_ADMIN_API_KEY' \
+      --header 'api-key: YOUR_API_KEY' \
       --header 'content-type: application/json' \
       --data '{
         "merchant_id": "merchant_abc123",
