@@ -25,47 +25,6 @@ Juspay hyperswitch provides a built-in hierarchy designed specifically for multi
 
 ![Platform Hierarchy Diagram](../.gitbook/assets/platform-hierarchy-diagram.png)
 
-<details>
-<summary>View Mermaid source (for maintainability)</summary>
-
-```mermaid
-flowchart TB
-    subgraph Org["Organisation"]
-        direction TB
-        O["Organisation ID<br/>Platform-level container"]
-        
-        subgraph Acc1["Account A"]
-            A1["Merchant Account ID<br/>Isolated API keys & routing rules"]
-            
-            subgraph Prof1A["Profile: US Store"]
-                P1A["Profile ID<br/>Regional configuration"]
-            end
-            
-            subgraph Prof1B["Profile: EU Store"]
-                P1B["Profile ID<br/>Regional configuration"]
-            end
-        end
-        
-        subgraph Acc2["Account B"]
-            A2["Merchant Account ID<br/>Isolated API keys & routing rules"]
-            
-            subgraph Prof2A["Profile: Default"]
-                P2A["Profile ID<br/>Configuration"]
-            end
-        end
-    end
-    
-    style Org fill:#f5f5f5,stroke:#333
-    style O fill:#e1f5fe,stroke:#01579b
-    style Acc1 fill:#fff8e1,stroke:#ff6f00
-    style Acc2 fill:#fff8e1,stroke:#ff6f00
-    style Prof1A fill:#e8f5e9,stroke:#2e7d32
-    style Prof1B fill:#e8f5e9,stroke:#2e7d32
-    style Prof2A fill:#e8f5e9,stroke:#2e7d32
-```
-
-</details>
-
 **Hierarchy Levels:**
 
 | Level | Purpose | Benefit |
