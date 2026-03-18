@@ -9,6 +9,17 @@ icon: desktop
 
 Juspay hyperswitch is an open-source payment orchestration platform that helps SaaS platforms scale multi-tenant payment infrastructure. It provides connector abstraction, hierarchical tenant isolation, and unified operations. You can onboard accounts programmatically, support BYOP (Bring Your Own Processor), and maintain unified observability across all connected payment providers.
 
+### API Key Concepts
+
+Hyperswitch uses two distinct API key types for different operational contexts:
+
+| Key Type | Purpose | Operations |
+|----------|---------|------------|
+| **Admin API Key** | Management operations | Merchant account creation, webhook configuration, connector setup, team management |
+| **Merchant API Key** | Payment operations | Processing payments, refunds, customer operations, saved cards |
+
+> **Note:** Regardless of which key type you're using, the HTTP header is always `api-key`. The distinction is in the key value itself, not the header name.
+
 ***
 
 ### Why do you struggle with multi-tenant payments?
@@ -23,7 +34,35 @@ The sections below outline the architectural patterns required to scale a multi-
 
 Juspay hyperswitch provides a built-in hierarchy designed specifically for multi-tenant platforms. Understanding this model is essential before implementing your integration.
 
-![Platform Hierarchy Diagram](../.gitbook/assets/platform-hierarchy-diagram.png)
+![Platform Hierarchy Diagram](../.gitbook/assets/platform-hierarchy-diagram.png "Hyperswitch Organisation → Account → Profile hierarchical data model for SaaS platforms")
+
+<details>
+<summary>View Mermaid source for diagram</summary>
+
+```mermaid
+flowchart TB
+    subgraph Org["Organisation"]
+        direction TB
+        O["Organisation ID<br/>Platform-level container"]
+        subgraph Acc1["Account A"]
+            A1["Merchant Account ID<br/>Isolated API keys & routing rules"]
+            subgraph Prof1A["Profile: US Store"]
+                P1A["Profile ID<br/>Regional configuration"]
+            end
+            subgraph Prof1B["Profile: EU Store"]
+                P1B["Profile ID<br/>Regional configuration"]
+            end
+        end
+        subgraph Acc2["Account B"]
+            A2["Merchant Account ID<br/>Isolated API keys & routing rules"]
+            subgraph Prof2A["Profile: Default"]
+                P2A["Profile ID<br/>Configuration"]
+            end
+        end
+    end
+```
+
+</details>
 
 **Hierarchy Levels:**
 
