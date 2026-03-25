@@ -2,7 +2,7 @@
 
 If you have ever integrated a payment processor, you know the drill. You read through a PDF that was last updated in 2019, figure out what combination of API keys goes in which header, discover that "decline code 51" means something subtly different on this processor than the last one you dealt with, and then do it all over again when your business decides to add a second processor.
 
-We have been living in this world for years building Hyperswitch, an open-source payment orchestrator. At some point we had integrations for 50+ connectors. The integrations worked well — but they were locked inside our orchestrator, not usable by anyone who just needed to talk to Stripe or Adyen without adopting an entire platform.
+We have been living in this world for years building Hyperswitch, an open-source payment orchestrator. At some point we had integrations for 60+ connectors. The integrations worked well — but they were locked inside our orchestrator, not usable by anyone who just needed to talk to Stripe or Adyen without adopting an entire platform.
 We always felt the Payment APIs are not more complicated than database drivers. It it just that the industry has not arrived at a standard (and it never will!!) for payments. Hence, we decided to build an open interface for Developer and AI agents to use, rather than recreate it every time.
 
 This post is about how we did that: unbundling those integrations into a standalone library called the **Prism**, and the engineering decisions we made along the way. Some of them are genuinely interesting.
@@ -25,7 +25,7 @@ So we separated the integration layer out. The result is a library with a well-d
 >
 > The core requirement was multi-language client generation. We needed Python developers, Java developers, TypeScript developers, and Rust developers to all be able to consume this library with first-class, type-safe APIs — without anyone hand-writing SDK code in each language. Protobuf has the most mature ecosystem for this: `prost` for Rust, `protoc-gen-java` for Java, `grpc_tools.protoc` for Python, and so on. It also doubles as our gRPC interface description when the library is deployed as a server, which turned out to be a natural fit for the two deployment modes we wanted to support (more on that below).
 
-The specification lives in `backend/grpc-api-types/proto/` and covers the full payment lifecycle across nine services:
+The specification lives in `crates/types-traits/grpc-api-types/proto/` and covers the full payment lifecycle across nine services:
 
 | Service | What it does |
 |---|---|
@@ -47,11 +47,11 @@ Everything is strongly typed. `PaymentService.Authorize` takes a `PaymentService
 
 > **Q: Why Rust? Wouldn't Go or Java be simpler?**
 >
-> A few reasons. First, we already had 50+ connector implementations in Rust from Hyperswitch, so starting there was practical. But more importantly: the library needs to be embeddable in Python, JavaScript, and Java applications without a separate process or a runtime dependency like the JVM or a Python interpreter. The only realistic way to distribute a native library that loads cleanly into all of those runtimes is as a compiled shared library — `.so` on Linux, `.dylib` on macOS. Rust produces exactly that, with no garbage collector pauses, no runtime to ship, and memory safety that does not require a GC.
+> A few reasons. First, we already had 60+ connector implementations in Rust from Hyperswitch, so starting there was practical. But more importantly: the library needs to be embeddable in Python, JavaScript, and Java applications without a separate process or a runtime dependency like the JVM or a Python interpreter. The only realistic way to distribute a native library that loads cleanly into all of those runtimes is as a compiled shared library — `.so` on Linux, `.dylib` on macOS. Rust produces exactly that, with no garbage collector pauses, no runtime to ship, and memory safety that does not require a GC.
 
 The Rust codebase is organized into a handful of internal crates:
 
-- `connector-integration` — The actual connector logic: 50+ implementations translating unified domain types into connector-specific HTTP requests and parsing responses back
+- `connector-integration` — The actual connector logic: 60+ implementations translating unified domain types into connector-specific HTTP requests and parsing responses back
 - `domain_types` — Shared models: `RouterDataV2`, flow markers (`Authorize`, `Capture`, `Refund`, ...), request/response data types
 - `grpc-api-types` — Rust types generated from the protobuf spec via `prost`
 - `interfaces` — The trait definitions that connector implementations must satisfy
@@ -139,7 +139,7 @@ This is where things get interesting. We wanted the library to work both as an *
 
 In SDK mode, the Rust core compiles into a native shared library (`.so` / `.dylib`) and is exposed to host languages via **UniFFI** — Mozilla's framework for generating language bindings from Rust automatically. When your Python code calls `authorize_req_transformer(request_bytes, options_bytes)`, that call crosses the FFI boundary directly into the Rust binary running in the same process.
 
-The FFI layer (`backend/ffi/`) is thin by design:
+The FFI layer (`crates/ffi/ffi/`) is thin by design:
 
 - `services/payments.rs` — the transformer implementations, wired to domain types via the macros above
 - `handlers/payments.rs` — loads the embedded config (yes, the connector URL config is baked into the binary) and delegates to the service transformers
@@ -153,7 +153,7 @@ Data crosses the language boundary as serialized protobuf bytes. This is intenti
 
 ### Mode 2: The gRPC server
 
-In gRPC mode, `backend/grpc-server` runs as a standalone async service built on **Tonic** (Rust's async gRPC framework). It implements all nine proto services, accepts gRPC connections from any language's generated stubs, makes the connector HTTP calls internally, and returns unified proto responses over the wire.
+In gRPC mode, `crates/grpc-server/grpc-server` runs as a standalone async service built on **Tonic** (Rust's async gRPC framework). It implements all nine proto services, accepts gRPC connections from any language's generated stubs, makes the connector HTTP calls internally, and returns unified proto responses over the wire.
 
 The gRPC server calls the same Rust core transformers as the FFI layer — just from a different entry point. The transformation logic is literally the same code path. The difference is that the HTTP client lives inside the server process, not in the caller's.
 
@@ -200,13 +200,13 @@ The code generator at `sdk/codegen/generate.py` reads two sources of truth and e
 > **Q: What are the two sources of truth?**
 >
 > 1. `services.proto` compiled to a binary descriptor — this tells the generator every RPC name, its request type, its response type, and its doc comment.
-> 2. `backend/ffi/src/services/payments.rs` — this tells the generator which flows are actually implemented, by scanning for `req_transformer!` invocations.
+> 2. `crates/ffi/ffi/src/services/payments.rs` — this tells the generator which flows are actually implemented, by scanning for `req_transformer!` invocations.
 >
 > The generator takes their intersection. A flow in proto but not implemented in Rust? Warning, skipped — we don't ship unimplemented APIs. A transformer in Rust with no matching proto RPC? Also a warning — the spec is the authority, not the implementation.
 
 Running `make generate` produces:
 
-**In Rust** (`backend/ffi/src/`):
+**In Rust** (`crates/ffi/ffi/src/`):
 - `_generated_flow_registrations.rs` — the `impl_flow_handlers!` wiring for each flow
 - `_generated_ffi_flows.rs` — the `define_ffi_flow!` UniFFI exposure for each flow
 
@@ -246,7 +246,7 @@ services.proto
     ├── protoc (JS plugin)              → proto.js / proto.d.ts (JS proto stubs)
     └── protoc (binary descriptor)      → services.desc
                                                 │
-backend/ffi/src/services/payments.rs ──────────┤
+crates/ffi/ffi/src/services/payments.rs ──────────┤
     (req/res transformer registrations)         │
                                                 ▼
                                           generate.py
@@ -322,7 +322,7 @@ In gRPC mode, steps ③b through ③f happen inside the `grpc-server` process. T
 
 We want to be upfront about what this is and what it is not.
 
-What it is: a working implementation with 50+ connectors, a protobuf specification that covers the full payment lifecycle, and SDKs in four languages. It is ready to use today.
+What it is: a working implementation with 60+ connectors, a protobuf specification that covers the full payment lifecycle, and SDKs in four languages. It is ready to use today.
 
 What it is not: a finished standard. The spec reflects our understanding of what payment integrations need to look like. That understanding is incomplete, and we know it. Payment APIs have a very long tail of edge cases — 3DS flows that differ between processors, webhook schemas that change without notice, authorization responses that technically succeeded but should be treated as soft declines. There is no team small enough to have seen all of it.
 
