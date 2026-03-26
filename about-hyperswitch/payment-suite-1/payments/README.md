@@ -30,7 +30,7 @@ POST /payments
 |-------|------|-------|-------------|
 | `confirm` | boolean | `true` | Automatically confirms the payment |
 | `capture_method` | string | `"automatic"` | Captures funds immediately |
-| `payment_method` | string | - | The payment method type |
+| `payment_method` | string | `"card"` | The payment method type (e.g., card, wallet, bank_transfer) |
 
 **Final Status:** `succeeded`
 
